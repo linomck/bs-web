@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BS Web Player</title>
+  <link rel="stylesheet" href="/watch.css">
+  <script src="/hls.min.js"></script>
+</head>
+<body>
+  <div class="player-container" id="player-container">
+    <video id="video-element" playsinline></video>
+
+    <header class="top-overlay" id="top-overlay">
+      <div class="episode-meta">
+        <h1 id="series-title">Wird geladen...</h1>
+        <h2 id="episode-subtitle">Staffel 1 - Folge 1</h2>
+      </div>
+
+      <div class="top-actions">
+        <div id="preload-badge" class="badge badge-loading">
+          <span class="spinner-dot"></span>
+          <span id="preload-badge-text">Stream wird aufgelöst...</span>
+        </div>
+
+        <button id="btn-episodes-top" class="action-btn episodes-btn" title="Alle Folgen anzeigen (Taste E)">
+          <span>☰ Folgen</span>
+          <span class="kbd-hint">E</span>
+        </button>
+
+        <button id="btn-skip-top" class="action-btn skip-btn" title="Nächste Folge abspielen (Taste N)">
+          <span>Folge überspringen</span>
+          <span class="btn-icon">⏭️</span>
+          <span class="kbd-hint">N</span>
+        </button>
+      </div>
+    </header>
+
+    <div class="center-indicator" id="center-indicator"></div>
+
+    <div class="countdown-overlay hidden" id="countdown-overlay">
+      <div class="countdown-card">
+        <h3>Folge beendet</h3>
+        <p>Nächste Episode startet in <span id="countdown-seconds">5</span>s...</p>
+        <div class="countdown-bar-container">
+          <div class="countdown-bar" id="countdown-bar"></div>
+        </div>
+        <div class="countdown-actions">
+          <button id="btn-countdown-now" class="action-btn-primary">Jetzt starten ⏭️</button>
+          <button id="btn-countdown-cancel" class="action-btn-secondary">Abbrechen</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="episodes-drawer hidden" id="episodes-drawer">
+      <div class="drawer-header">
+        <div class="drawer-title-area">
+          <img id="drawer-cover" class="drawer-cover hidden" alt="Cover">
+          <div>
+            <h2 id="drawer-series-title">Episodenauswahl</h2>
+            <p id="drawer-series-subtitle">Wähle eine Folge zum direkten Abspielen</p>
+          </div>
+        </div>
+        <button id="btn-close-drawer" class="icon-btn close-btn" title="Schließen (Esc / E)">✕</button>
+      </div>
+
+      <div class="season-tabs" id="season-tabs"></div>
+      <div class="episodes-list" id="episodes-list"></div>
+    </div>
+
+    <div class="bottom-controls" id="bottom-controls">
+      <div class="progress-bar-wrapper" id="progress-wrapper">
+        <div class="progress-buffer" id="progress-buffer"></div>
+        <div class="progress-played" id="progress-played"></div>
+        <div class="progress-handle" id="progress-handle"></div>
+      </div>
+
+      <div class="controls-row">
+        <div class="controls-group">
+          <button id="btn-play-pause" class="icon-btn" title="Play/Pause (Leertaste)">
+            <svg id="icon-play" viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+              <path d="M8 5v14l11-7z"/>
+            </svg>
+            <svg id="icon-pause" class="hidden" viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+              <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+            </svg>
+          </button>
+
+          <div class="volume-container">
+            <button id="btn-mute" class="icon-btn" title="Stummschalten (M)">
+              <svg id="icon-volume-high" viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+                <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+              </svg>
+              <svg id="icon-volume-muted" class="hidden" viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+                <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
+              </svg>
+            </button>
+            <input type="range" id="volume-slider" min="0" max="1" step="0.05" value="1">
+          </div>
+
+          <div class="time-display">
+            <span id="current-time">00:00</span> / <span id="total-duration">00:00</span>
+          </div>
+        </div>
+
+        <div class="controls-group">
+          <button id="btn-episodes-bottom" class="inline-episodes-btn" title="Episodenauswahl (E)">
+            <span>☰ Folgen</span>
+          </button>
+
+          <button id="btn-skip-bottom" class="inline-skip-link" title="Nächste Folge (N)">
+            <span>Folge überspringen ⏭️</span>
+          </button>
+
+          <select id="playback-speed" class="speed-select" title="Geschwindigkeit">
+            <option value="0.75">0.75x</option>
+            <option value="1" selected>1.0x</option>
+            <option value="1.25">1.25x</option>
+            <option value="1.5">1.5x</option>
+            <option value="2">2.0x</option>
+          </select>
+
+          <button id="btn-fullscreen" class="icon-btn" title="Vollbild (F)">
+            <svg id="icon-fs-enter" viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+              <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+            </svg>
+            <svg id="icon-fs-exit" class="hidden" viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+              <path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/watch.js"></script>
+</body>
+</html>

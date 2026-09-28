@@ -1,0 +1,10 @@
+.genre-bar {
+  display: flex;
+  gap: 8px;
+  padding: 16px 32px 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.genre-bar::-webkit-scrollbar {
+  display: none;
+}

@@ -1,0 +1,21 @@
+{
+  "name": "bs-web",
+  "version": "1.0.0",
+  "description": "Standalone Burning Series Katalog & Player (Node/Express) - portiert aus bs-autowatch",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0",
+    "cheerio": "^1.0.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "undici": "^6.19.8"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
