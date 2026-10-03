@@ -43,9 +43,9 @@ async function ensureCatalogSynced() {
     console.log('[Catalog] Synchronisiere Katalog von Burning Series...');
     try {
       const entries = await scraper.fetchCatalog();
-      db.upsertSeriesBulk(entries.map((e) => ({ slug: e.slug, title: e.title, updatedAt: 0 })));
+      const added = db.insertNewSeries(entries);
       db.markCatalogSynced();
-      console.log(`[Catalog] ${entries.length} Serien synchronisiert.`);
+      console.log(`[Catalog] ${entries.length} Serien im Katalog, ${added} neu.`);
     } catch (err) {
       console.error('[Catalog] Sync fehlgeschlagen:', err.message);
     } finally {
@@ -61,39 +61,87 @@ async function ensureCatalogSynced() {
 // parallele Requests), da dies reines I/O ist und BS bislang keine
 // spürbaren Rate-Limits zeigt. ~10.500 Serien sollen so in Minuten statt
 // Stunden durchlaufen.
-let enrichRunning = false;
-async function enrichBatch(limit = 30) {
-  if (enrichRunning) return;
-  enrichRunning = true;
+const ENRICH_CONCURRENCY = parseInt(process.env.ENRICH_CONCURRENCY, 10) || 12;
+const enrichInFlight = new Set();
+let enrichDone = 0;
+let enrichActiveWorkers = 0;
+const enrichRetryAfter = new Map(); // slug -> Zeitstempel (Netzwerkfehler-Cooldown)
+let enrichConsecutiveNetFails = 0;
+let enrichPausedUntil = 0;
+
+function claimNextUnenriched() {
+  // Holt eine Serie, die noch nicht angereichert ist und nicht gerade läuft.
+  if (Date.now() < enrichPausedUntil) return null;
+  const rows = db.db
+    .prepare(`SELECT slug FROM series WHERE updated_at = 0 LIMIT ?`)
+    .all(ENRICH_CONCURRENCY * 4 + enrichRetryAfter.size);
+  const t = Date.now();
+  for (const r of rows) {
+    if (!enrichInFlight.has(r.slug) && (enrichRetryAfter.get(r.slug) || 0) <= t) {
+      enrichInFlight.add(r.slug);
+      return r.slug;
+    }
+  }
+  return null;
+}
+
+async function enrichWorker() {
+  enrichActiveWorkers++;
   try {
-    const rows = db.db
-      .prepare(`SELECT slug FROM series WHERE updated_at = 0 LIMIT ?`)
-      .all(limit);
-    if (rows.length === 0) return;
-
-    await Promise.allSettled(
-      rows.map(async (row) => {
-        try {
-          const meta = await scraper.fetchSeries(row.slug);
-          db.upsertSeries({ ...meta, updatedAt: Date.now() });
-          db.registerSeasons(row.slug, meta.seasons || [1]);
-        } catch (err) {
-          db.upsertSeries({ slug: row.slug, title: row.slug, updatedAt: Date.now() });
-          console.warn(`[Enrich] Fehler bei '${row.slug}':`, err.message);
+    for (;;) {
+      const slug = claimNextUnenriched();
+      if (!slug) return;
+      try {
+        const meta = await scraper.fetchSeries(slug);
+        db.upsertSeries({ ...meta, updatedAt: Date.now() });
+        db.registerSeasons(slug, meta.seasons || [1]);
+        enrichRetryAfter.delete(slug);
+        enrichConsecutiveNetFails = 0;
+      } catch (err) {
+        const reason = (err.cause && (err.cause.code || err.cause.message)) || err.message;
+        if (/^HTTP 404/.test(err.message)) {
+          // Serie existiert nicht (mehr): endgültig als erledigt markieren
+          const ex = db.getSeries(slug);
+          db.upsertSeries({ slug, title: ex && ex.title, updatedAt: Date.now() });
+        } else {
+          // Netzwerk-/Serverfehler: NICHT als angereichert speichern, später erneut versuchen
+          enrichRetryAfter.set(slug, Date.now() + 5 * 60 * 1000);
+          if (++enrichConsecutiveNetFails >= 10) {
+            enrichPausedUntil = Date.now() + 60 * 1000;
+            enrichConsecutiveNetFails = 0;
+            console.warn(`[Enrich] Viele Netzwerkfehler (${reason}) - pausiere 60s`);
+          }
         }
-      })
-    );
-
-    const remaining = db.db.prepare(`SELECT COUNT(*) AS c FROM series WHERE updated_at = 0`).get().c;
-    console.log(`[Enrich] Batch fertig (${rows.length} Serien), verbleibend: ${remaining}`);
+      } finally {
+        enrichInFlight.delete(slug);
+        if (++enrichDone % 200 === 0) {
+          const remaining = db.db
+            .prepare(`SELECT COUNT(*) AS c FROM series WHERE updated_at = 0`)
+            .get().c;
+          console.log(`[Enrich] ${enrichDone} fertig, verbleibend: ${remaining}`);
+        }
+      }
+    }
   } finally {
-    enrichRunning = false;
+    enrichActiveWorkers--;
+  }
+}
+
+// Füllt den Worker-Pool kontinuierlich auf; jeder Worker zieht sofort die
+// nächste Serie, sobald er fertig ist (kein Warten auf langsamste im Batch).
+function enrichTick() {
+  while (enrichActiveWorkers < ENRICH_CONCURRENCY) {
+    const before = enrichActiveWorkers;
+    enrichWorker();
+    if (enrichActiveWorkers === before) break;
+    // Worker beendet sich sofort, wenn nichts zu tun ist
+    if (enrichInFlight.size === 0 && enrichActiveWorkers === 0) break;
   }
 }
 
 ensureCatalogSynced();
 setInterval(() => ensureCatalogSynced(), 60 * 60 * 1000);
-setInterval(() => enrichBatch(30), 500);
+setInterval(enrichTick, 1000);
 
 // ---------------------------------------------------------------------------
 // API: Katalog

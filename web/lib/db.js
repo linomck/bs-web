@@ -87,8 +87,9 @@ db.exec(`
 // --- TTL Konstanten (Millisekunden) ---
 const TTL = {
   CATALOG: 24 * 60 * 60 * 1000,
-  SERIES: 12 * 60 * 60 * 1000,
-  SEASON: 12 * 60 * 60 * 1000,
+  // Serien-Metadaten ändern sich kaum -> lokal dauerhaft behalten (1 Jahr)
+  SERIES: 365 * 24 * 60 * 60 * 1000,
+  SEASON: 7 * 24 * 60 * 60 * 1000,
   STREAM: 15 * 60 * 1000,
 };
 
@@ -133,6 +134,20 @@ function upsertSeries(entry) {
     cast: entry.cast ? JSON.stringify(entry.cast) : '',
     updated_at: entry.updatedAt != null ? entry.updatedAt : now(),
   });
+}
+
+const insertNewSeriesStmt = db.prepare(
+  `INSERT INTO series (slug, title, updated_at) VALUES (?, ?, 0) ON CONFLICT(slug) DO NOTHING`
+);
+
+// Katalog-Sync: nur NEUE Serien anlegen, bestehende (angereicherte) bleiben unberührt.
+function insertNewSeries(entries) {
+  let added = 0;
+  const tx = db.transaction((rows) => {
+    for (const r of rows) added += insertNewSeriesStmt.run(r.slug, r.title || r.slug).changes;
+  });
+  tx(entries);
+  return added;
 }
 
 function upsertSeriesBulk(entries) {
@@ -373,6 +388,7 @@ module.exports = {
   setMeta,
   upsertSeries,
   upsertSeriesBulk,
+  insertNewSeries,
   getSeries,
   isSeriesStale,
   isCatalogStale,
