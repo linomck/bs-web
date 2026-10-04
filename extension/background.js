@@ -64,7 +64,7 @@ function parseEpisodePage(html) {
 async function fetchTicket(apiBase, pageUrl, sitekey, authToken) {
   const r = await fetch(apiBase + '/api/captcha', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (token || '') },
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (authToken || '') },
     body: JSON.stringify({ pageUrl, sitekey }),
   });
   const d = await r.json().catch(() => ({}));

@@ -273,7 +273,7 @@
     const season = next.season;
     const episode = next.number;
 
-    if (window.BSResolver.isExtReady()) {
+    {
       const key = `${slug}_${season}_${episode}`;
       const p = resolveViaExtension(slug, season, episode);
       extCache.set(key, p);
@@ -287,36 +287,6 @@
       });
       return;
     }
-
-    fetch('/api/preload', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slug, season, episode }),
-    }).catch(() => {});
-
-    const poll = () => {
-      // Falls der Nutzer inzwischen weitergesprungen ist, nicht mehr aktualisieren.
-      if (!currentParams.nextEpisode || currentParams.nextEpisode.number !== episode || currentParams.nextEpisode.season !== season) {
-        return;
-      }
-
-      fetch(`/api/preload/status?slug=${encodeURIComponent(slug)}&season=${season}&episode=${episode}`)
-        .then((r) => r.json())
-        .then((status) => {
-          if (status.ready) {
-            updatePreloadBadge('ready', `Nächste Folge bereit: S${season}E${episode}`);
-          } else if (status.error) {
-            updatePreloadBadge('error', `Vorladen fehlgeschlagen: ${status.error}`);
-          } else {
-            preloadPollTimer = setTimeout(poll, 3000);
-          }
-        })
-        .catch(() => {
-          preloadPollTimer = setTimeout(poll, 3000);
-        });
-    };
-
-    preloadPollTimer = setTimeout(poll, 3000);
   }
 
   function skipToNextEpisode() {

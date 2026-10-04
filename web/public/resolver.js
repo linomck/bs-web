@@ -2,6 +2,7 @@
 (function () {
   let extId = null;
   let extReady = false;
+  let extError = '';
   const extCache = new Map(); // "slug_s_e" -> Promise<data>
   const STASH_KEY = 'bs_prefetch';
 
@@ -49,12 +50,17 @@
 
   const extInit = (async () => {
     try {
-      if (!window.chrome || !chrome.runtime || !chrome.runtime.sendMessage) return;
+      if (!window.chrome || !chrome.runtime || !chrome.runtime.sendMessage) {
+        extError = 'Browser/Seite hat keinen Zugriff auf Extensions';
+        return;
+      }
       extId = (await (await fetch('/api/config')).json()).extensionId;
       const pong = await extSend({ type: 'ping' });
       extReady = !!(pong && pong.ok);
+      if (!extReady) extError = 'Extension antwortet nicht';
     } catch (e) {
       extReady = false;
+      extError = e.message;
     }
   })();
 
@@ -77,18 +83,6 @@
     return { directM3u8: m3u8, m3u8: proxyUrlFor(m3u8), episode: info.episode, nextEpisode: info.nextEpisode };
   }
 
-  async function resolveViaServer(slug, season, episode, onStatus) {
-    if (onStatus) onStatus('Server löst Stream auf (Captcha + Extraktion)...');
-    const resp = await fetch('/api/resolve', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slug, season, episode }),
-    });
-    const data = await resp.json();
-    if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
-    return data;
-  }
-
   function takeStash(key) {
     try {
       const s = JSON.parse(sessionStorage.getItem(STASH_KEY) || 'null');
@@ -104,22 +98,16 @@
     if (stashed) return stashed;
 
     await extInit;
-    if (extReady) {
-      let p = extCache.get(key);
-      if (!p) {
-        p = resolveViaExtension(slug, season, episode, onStatus);
-        extCache.set(key, p);
-        p.catch(() => extCache.delete(key));
-      }
-      try {
-        return await p;
-      } catch (err) {
-        console.warn('[Resolver] Extension-Resolve fehlgeschlagen, Server-Fallback:', err.message);
-        extCache.delete(key);
-      }
+    if (!extReady) {
+      throw new Error('N2nd-Extension nicht erreichbar: ' + (extError || 'unbekannt') + '. Bitte Extension installieren/neu laden.');
     }
-    if (onStatus && extReady) onStatus('Extension fehlgeschlagen – Fallback auf Server...');
-    return resolveViaServer(slug, season, episode, onStatus);
+    let p = extCache.get(key);
+    if (!p) {
+      p = resolveViaExtension(slug, season, episode, onStatus);
+      extCache.set(key, p);
+      p.catch(() => extCache.delete(key));
+    }
+    return p;
   }
 
   /** Löst auf und merkt das Ergebnis für die Player-Seite vor. */

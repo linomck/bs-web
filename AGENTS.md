@@ -37,7 +37,7 @@ web/
 ## 2. Datenfluss
 
 ```
-Browser ── POST /api/resolve {slug, season, episode}
+Browser ── GET /api/episode-info, dann Extension (siehe 2a)
    │
    ▼
 server.js: resolveEpisodeStream()
@@ -62,9 +62,9 @@ extension: Episodenseite (Cookie-Jar des Browsers) -> POST {server}/api/captcha 
 watch.js ── hls.js direkt aufs VOE-CDN (Proxy /api/hls bleibt Fallback)
 ```
 Das VOE-CDN sendet keine CORS-Header; die Extension ergänzt sie per `declarativeNetRequest` (`extension/rules.json`, nur für Requests mit Initiator `stream.n2nd.de`/`localhost`). Bei anderer Domain `initiatorDomains` anpassen.
-Ohne Extension oder bei Fehler: Fallback auf `POST /api/resolve` (alles serverseitig). `GET /api/config` liefert die Extension-ID (Env `EXTENSION_ID`, Default = ID aus dem `key` im Manifest). `externally_connectable` in `extension/manifest.json` muss die Web-Domain enthalten. `/api/captcha` ist auf BS-Hosts + Sitekey-Format beschränkt und rate-limitiert (10/min/IP). Preload läuft im Hybrid-Modus clientseitig über die Extension. Installation: `chrome://extensions` -> Entwicklermodus -> "Entpackte Erweiterung laden" -> `extension/`.
+Es gibt KEINEN serverseitigen Resolve-Fallback mehr (`/api/resolve`, `/api/preload` entfernt): ohne Extension zeigt der Player einen Fehler. `GET /api/config` liefert die Extension-ID (Env `EXTENSION_ID`, Default = ID aus dem `key` im Manifest). `externally_connectable` in `extension/manifest.json` muss die Web-Domain enthalten. `/api/captcha` ist auf BS-Hosts + Sitekey-Format beschränkt und rate-limitiert (10/min/IP). Preload läuft im Hybrid-Modus clientseitig über die Extension. Installation: `chrome://extensions` -> Entwicklermodus -> "Entpackte Erweiterung laden" -> `extension/`.
 
-API-Endpunkte: `GET /api/catalog`, `GET /api/genres`, `GET /api/series/:slug`, `GET /api/series/:slug/season/:num`, `POST /api/resolve`, `POST /api/preload`, `GET /api/preload/status`, `GET /api/hls`, `GET /api/config`, `GET /api/episode-info`, `POST /api/captcha`. Seiten: `/`, `/serie/:slug`, `/watch`.
+API-Endpunkte: `GET /api/catalog`, `GET /api/genres`, `GET /api/series/:slug`, `GET /api/series/:slug/season/:num`, `GET /api/hls`, `GET /api/config`, `GET /api/episode-info`, `POST /api/captcha`. Seiten: `/`, `/serie/:slug`, `/watch`.
 
 ### 2b. Login & Nutzer (`lib/auth.js`)
 Die App macht den OIDC-Login (Pocket ID, Authorization-Code + PKCE) selbst; die Traefik-Middleware `pocketid-auth` wird für N2nd **nicht** benutzt. Routen: `/auth/login`, `/auth/callback`. Sessions liegen in SQLite (`sessions`, Cookie `n2nd_sid`, 30 Tage). Env: `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_REQUIRED_GROUP` (optional), `SESSION_SECRET`, `PUBLIC_URL` (aus `DOMAIN`). Redirect-URI im Pocket-ID-Client: `https://<DOMAIN>/auth/callback`. Ohne `OIDC_ISSUER` ist Auth aus und der Nutzer ist `local`.
@@ -126,7 +126,7 @@ TVmaze (`https://api.tvmaze.com/singlesearch/shows?q=...&embed=episodes`, kein A
 
 ## 6. Konfiguration & Betrieb
 
-- Env: `PORT` (3000), `CAPSOLVER_API_KEY` (Pflicht für `/api/resolve`), `BS_BASE_URL`, `BS_FALLBACK_URL`, `ENRICH_CONCURRENCY`.
+- Env: `PORT` (3000), `CAPSOLVER_API_KEY` (Pflicht für `/api/captcha`), `BS_BASE_URL`, `BS_FALLBACK_URL`, `ENRICH_CONCURRENCY`.
 - Lokal: `cd web && npm install && npm start` (`npm run dev` mit `--watch`). Node >= 18.
 - Docker: `docker compose up -d --build` im Repo-Root. Das Image läuft als Nicht-Root-User; Daten im Volume `n2nd-data`. Traefik-Labels erwarten ein externes Netzwerk (`TRAEFIK_NETWORK`) und `DOMAIN`.
 - Syntaxprüfung:
