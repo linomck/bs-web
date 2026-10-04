@@ -29,9 +29,4 @@ services:
       - traefik.http.routers.n2nd.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}
       - traefik.http.routers.n2nd.tls.certresolver=${TRAEFIK_CERTRESOLVER:-le}
       - traefik.http.services.n2nd.loadbalancer.server.port=3000
-      - traefik.http.routers.n2nd.middlewares=pocketid-auth
-      - traefik.http.middlewares.pocketid-auth.plugin.traefik-oidc-auth.provider.url=${OIDC_PROVIDER_URL:-https://id.n2nd.de}
-      - traefik.http.middlewares.pocketid-auth.plugin.traefik-oidc-auth.provider.clientId=${OIDC_CLIENT_ID}
-      - traefik.http.middlewares.pocketid-auth.plugin.traefik-oidc-auth.provider.clientSecret=${OIDC_CLIENT_SECRET}
-      - traefik.http.middlewares.pocketid-auth.plugin.traefik-oidc-auth.secret=${OIDC_COOKIE_SECRET}
-      - traefik.http.middlewares.pocketid-auth.plugin.traefik-oidc-auth.scopes=openid,profile,email,groups
+      - traefik.http.routers.n2nd.middlewares=pocketid-auth@docker
