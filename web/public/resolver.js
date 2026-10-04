@@ -18,7 +18,7 @@
     });
   }
 
-  function extResolve(episodeUrl, onStatus) {
+  function extResolve(episodeUrl, token, onStatus) {
     return new Promise((resolve, reject) => {
       let finished = false;
       let port;
@@ -43,7 +43,7 @@
       port.onDisconnect.addListener(() => {
         if (!finished) reject(new Error('Verbindung zur Extension abgebrochen'));
       });
-      port.postMessage({ type: 'resolve', episodeUrl });
+      port.postMessage({ type: 'resolve', episodeUrl, token });
     });
   }
 
@@ -73,7 +73,7 @@
     const info = await infoResp.json();
     if (!infoResp.ok) throw new Error(info.error || `HTTP ${infoResp.status}`);
     say('Anfrage wird an Extension gesendet...');
-    const m3u8 = await extResolve(info.episodeUrl, say);
+    const m3u8 = await extResolve(info.episodeUrl, info.captchaToken, say);
     return { directM3u8: m3u8, m3u8: proxyUrlFor(m3u8), episode: info.episode, nextEpisode: info.nextEpisode };
   }
 

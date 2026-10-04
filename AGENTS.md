@@ -26,6 +26,7 @@ web/
     capsolver.js       reCAPTCHA v2 (ReCaptchaV2TaskProxyLess)
     voe.js             VOE-Redirect-Gate + MKGMa-Decoder
     tvmaze.js          TVmaze-Anreicherung
+    auth.js            OIDC-Login (Pocket ID), Sessions, Captcha-Token
     hls-proxy.js       Playlist-Rewrite + Segment-Proxy (/api/hls)
   public/              index / series / watch (html, js, css), theme.css, hls.min.js
   data/bs.db           SQLite-DB (gitignored, Docker-Volume n2nd-data -> /app/data)
@@ -64,6 +65,11 @@ Das VOE-CDN sendet keine CORS-Header; die Extension ergänzt sie per `declarativ
 Ohne Extension oder bei Fehler: Fallback auf `POST /api/resolve` (alles serverseitig). `GET /api/config` liefert die Extension-ID (Env `EXTENSION_ID`, Default = ID aus dem `key` im Manifest). `externally_connectable` in `extension/manifest.json` muss die Web-Domain enthalten. `/api/captcha` ist auf BS-Hosts + Sitekey-Format beschränkt und rate-limitiert (10/min/IP). Preload läuft im Hybrid-Modus clientseitig über die Extension. Installation: `chrome://extensions` -> Entwicklermodus -> "Entpackte Erweiterung laden" -> `extension/`.
 
 API-Endpunkte: `GET /api/catalog`, `GET /api/genres`, `GET /api/series/:slug`, `GET /api/series/:slug/season/:num`, `POST /api/resolve`, `POST /api/preload`, `GET /api/preload/status`, `GET /api/hls`, `GET /api/config`, `GET /api/episode-info`, `POST /api/captcha`. Seiten: `/`, `/serie/:slug`, `/watch`.
+
+### 2b. Login & Nutzer (`lib/auth.js`)
+Die App macht den OIDC-Login (Pocket ID, Authorization-Code + PKCE) selbst; die Traefik-Middleware `pocketid-auth` wird für N2nd **nicht** benutzt. Routen: `/auth/login`, `/auth/callback`, `/auth/logout`. Sessions liegen in SQLite (`sessions`, Cookie `n2nd_sid`, 30 Tage). Env: `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_REQUIRED_GROUP` (optional), `SESSION_SECRET`, `PUBLIC_URL` (aus `DOMAIN`). Redirect-URI im Pocket-ID-Client: `https://<DOMAIN>/auth/callback`. Ohne `OIDC_ISSUER` ist Auth aus und der Nutzer ist `local`.
+`/api/captcha` wird von der Extension aufgerufen (ohne Session-Cookie) und ist über ein kurzlebiges HMAC-Token geschützt: `/api/episode-info` liefert `captchaToken`, die Extension sendet es als `Authorization: Bearer`.
+Pro Nutzer: Tabelle `watch_progress` (eine Zeile pro Serie), API `GET/PUT /api/progress`, `DELETE /api/progress/:slug`, `GET /api/me`. Startseite: `GET /api/home` (Hero, Neu, Genre-Reihen). Der Player speichert alle 15 s und stellt über `&t=<Sekunden>` wieder her.
 
 ---
 

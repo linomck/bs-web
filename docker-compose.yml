@@ -18,6 +18,12 @@ services:
       - CAPSOLVER_API_KEY=${CAPSOLVER_API_KEY}
       - BS_BASE_URL=${BS_BASE_URL:-https://burningseries.cx}
       - BS_FALLBACK_URL=${BS_FALLBACK_URL:-https://bs.to}
+      - PUBLIC_URL=https://${DOMAIN}
+      - OIDC_ISSUER=${OIDC_ISSUER:-}
+      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID:-}
+      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-}
+      - OIDC_REQUIRED_GROUP=${OIDC_REQUIRED_GROUP:-}
+      - SESSION_SECRET=${SESSION_SECRET:-}
     volumes:
       - n2nd-data:/app/data
     networks:
@@ -29,4 +35,3 @@ services:
       - traefik.http.routers.n2nd.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}
       - traefik.http.routers.n2nd.tls.certresolver=${TRAEFIK_CERTRESOLVER:-le}
       - traefik.http.services.n2nd.loadbalancer.server.port=3000
-      - traefik.http.routers.n2nd.middlewares=pocketid-auth@docker

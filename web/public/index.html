@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="/index.css">
 </head>
 <body>
+  <div class="bg-glow" aria-hidden="true"></div>
   <nav class="topnav">
     <span class="brand">N2nd</span>
     <div class="search-box">
@@ -16,13 +17,19 @@
     </div>
   </nav>
 
-  <div id="genre-bar" class="genre-bar"></div>
+  <main id="home">
+    <section id="hero" class="hero skeleton-block"></section>
+    <section id="rows"></section>
+  </main>
 
-  <div id="catalog-grid" class="grid">
-    <div class="state-message"><span class="spinner"></span>Katalog wird geladen...</div>
-  </div>
-
-  <div id="pagination" class="pagination"></div>
+  <section class="all-section">
+    <h2 class="row-title">Alle Serien</h2>
+    <div id="genre-bar" class="genre-bar"></div>
+    <div id="catalog-grid" class="grid">
+      <div class="state-message"><span class="spinner"></span>Katalog wird geladen...</div>
+    </div>
+    <div id="pagination" class="pagination"></div>
+  </section>
 
   <script src="/ext-status.js"></script>
   <script src="/index.js"></script>

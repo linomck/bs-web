@@ -61,11 +61,10 @@ function parseEpisodePage(html) {
   return { lid, token, sitekey: sk ? sk[1] : null };
 }
 
-async function fetchTicket(apiBase, pageUrl, sitekey) {
+async function fetchTicket(apiBase, pageUrl, sitekey, authToken) {
   const r = await fetch(apiBase + '/api/captcha', {
     method: 'POST',
-    credentials: 'include', // OIDC-Session-Cookie der N2nd-Domain mitsenden
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (token || '') },
     body: JSON.stringify({ pageUrl, sitekey }),
   });
   const d = await r.json().catch(() => ({}));
@@ -73,7 +72,7 @@ async function fetchTicket(apiBase, pageUrl, sitekey) {
   return d.ticket;
 }
 
-async function resolveEpisode(episodeUrl, apiBase, step = () => {}) {
+async function resolveEpisode(episodeUrl, apiBase, step = () => {}, authToken = '') {
   const u = new URL(episodeUrl);
   if (!BS_HOSTS.includes(u.hostname)) throw new Error('Ungültiger Host');
 
@@ -87,7 +86,7 @@ async function resolveEpisode(episodeUrl, apiBase, step = () => {}) {
   if (!sitekey) throw new Error('reCAPTCHA-Sitekey nicht gefunden');
 
   step('Extension: Captcha wird gelöst (kann 10-40s dauern)...');
-  const ticket = await fetchTicket(apiBase, pageUrl, sitekey);
+  const ticket = await fetchTicket(apiBase, pageUrl, sitekey, authToken);
 
   step('Extension: Hoster-Link wird abgerufen...');
   const embed = await fetch(new URL('/ajax/embed.php', pageUrl).href, {
@@ -120,7 +119,7 @@ chrome.runtime.onMessageExternal.addListener((msg, sender, sendResponse) => {
     return;
   }
   if (msg.type === 'resolve') {
-    resolveEpisode(msg.episodeUrl, sender.origin)
+    resolveEpisode(msg.episodeUrl, sender.origin, undefined, msg.token)
       .then((m3u8) => sendResponse({ ok: true, m3u8 }))
       .catch((e) => sendResponse({ ok: false, error: e.message }));
     return true;
@@ -132,7 +131,7 @@ chrome.runtime.onConnectExternal.addListener((port) => {
   const origin = port.sender && port.sender.origin;
   port.onMessage.addListener((msg) => {
     if (!msg || msg.type !== 'resolve' || !origin) return;
-    resolveEpisode(msg.episodeUrl, origin, (text) => port.postMessage({ step: text }))
+    resolveEpisode(msg.episodeUrl, origin, (text) => port.postMessage({ step: text }), msg.token)
       .then((m3u8) => port.postMessage({ done: true, m3u8 }))
       .catch((e) => port.postMessage({ done: false, error: e.message }));
   });

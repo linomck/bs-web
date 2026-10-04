@@ -94,6 +94,7 @@
       newUrl.searchParams.set('title', title);
       newUrl.searchParams.set('season', season);
       newUrl.searchParams.set('episode', episode);
+      newUrl.searchParams.delete('t');
       window.history.replaceState({}, '', newUrl.toString());
     } catch (e) {}
   }
@@ -203,6 +204,9 @@
   async function resolveAndPlay(slug, season, episode, title) {
     clearTimeout(preloadPollTimer);
     const myToken = ++resolveToken;
+    saveProgress(true);
+    hasPlayed = false;
+    if (myToken > 1) pendingResume = 0;
     cancelCountdown();
     video.pause();
     if (hls) {
@@ -480,6 +484,55 @@
   });
 
   video.addEventListener('ended', () => triggerEndCountdown());
+
+  // --- Verlauf: Position pro Nutzer speichern / wiederherstellen ---
+  let pendingResume = parseFloat(new URLSearchParams(window.location.search).get('t')) || 0;
+  let hasPlayed = false;
+  let lastSave = 0;
+
+  function saveProgress(force) {
+    if (!hasPlayed || !currentParams.slug) return;
+    const t = Date.now();
+    if (!force && t - lastSave < 15000) return;
+    lastSave = t;
+    fetch('/api/progress', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      keepalive: true,
+      body: JSON.stringify({
+        slug: currentParams.slug,
+        season: currentParams.season,
+        episode: currentParams.episode,
+        position: video.currentTime || 0,
+        duration: video.duration || 0,
+      }),
+    }).catch(() => {});
+  }
+
+  video.addEventListener('playing', () => { hasPlayed = true; });
+  video.addEventListener('loadedmetadata', () => {
+    if (pendingResume > 5 && pendingResume < (video.duration || Infinity) - 10) {
+      video.currentTime = pendingResume;
+    }
+    pendingResume = 0;
+  });
+  video.addEventListener('timeupdate', () => saveProgress(false));
+  video.addEventListener('pause', () => { if (!video.ended) saveProgress(true); });
+  video.addEventListener('ended', () => {
+    const next = currentParams.nextEpisode;
+    if (next) {
+      fetch('/api/progress', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug: currentParams.slug, season: next.season, episode: next.number, position: 0, duration: 0 }),
+      }).catch(() => {});
+    } else {
+      fetch('/api/progress/' + encodeURIComponent(currentParams.slug), { method: 'DELETE' }).catch(() => {});
+    }
+    hasPlayed = false;
+  });
+  window.addEventListener('pagehide', () => saveProgress(true));
+
 
   progressWrapper.addEventListener('click', (e) => {
     const rect = progressWrapper.getBoundingClientRect();

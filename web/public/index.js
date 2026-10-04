@@ -62,23 +62,40 @@
     activeEl.classList.add('active');
   }
 
-  function renderCard(item) {
+  function initials(t) {
+    return String(t || '?').trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+  }
+
+  function renderCard(item, opts = {}) {
     const div = document.createElement('div');
     div.className = 'card';
     div.addEventListener('click', () => {
-      window.location.href = `/serie/${encodeURIComponent(item.slug)}`;
+      window.location.href = opts.href || `/serie/${encodeURIComponent(item.slug)}`;
     });
 
+    const placeholder = `<div class="placeholder initials">${escapeHtml(initials(item.title))}</div>`;
     const coverHtml = item.coverUrl
       ? `<img src="${escapeHtml(item.coverUrl)}" alt="${escapeHtml(item.title)}" loading="lazy" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-         <div class="placeholder" style="display:none;">🎬</div>`
-      : `<div class="placeholder">🎬</div>`;
+         ${placeholder.replace('class="placeholder', 'style="display:none;" class="placeholder')}`
+      : placeholder;
 
+    const pct = opts.progress ? Math.min(100, Math.round(opts.progress * 100)) : 0;
     div.innerHTML = `
-      <div class="card-cover">${coverHtml}</div>
+      <div class="card-cover">
+        ${coverHtml}
+        <div class="overlay">▶</div>
+        ${pct ? `<div class="progress"><div style="width:${pct}%"></div></div>` : ''}
+        ${opts.onRemove ? '<button class="remove" title="Entfernen">✕</button>' : ''}
+      </div>
       <div class="card-title" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</div>
-      <div class="card-meta">${escapeHtml((item.genres || []).slice(0, 2).join(' • '))}</div>
+      <div class="card-meta">${escapeHtml(opts.meta != null ? opts.meta : (item.genres || []).slice(0, 2).join(' • '))}</div>
     `;
+    if (opts.onRemove) {
+      div.querySelector('.remove').addEventListener('click', (e) => {
+        e.stopPropagation();
+        opts.onRemove(div);
+      });
+    }
     return div;
   }
 
@@ -111,7 +128,7 @@
   }
 
   async function loadCatalog() {
-    grid.innerHTML = '<div class="state-message"><span class="spinner"></span>Lädt...</div>';
+    grid.innerHTML = Array(12).fill('<div class="skeleton"></div>').join('');
     pagination.innerHTML = '';
 
     const params = new URLSearchParams({
@@ -149,4 +166,76 @@
 
   loadGenres();
   loadCatalog();
+  // ---------- Startseite: Hero + Reihen ----------
+  const heroEl = document.getElementById('hero');
+  const rowsEl = document.getElementById('rows');
+
+  function renderHero(h) {
+    if (!h) { heroEl.remove(); return; }
+    heroEl.classList.remove('skeleton-block');
+    const url = `/serie/${encodeURIComponent(h.slug)}`;
+    heroEl.innerHTML = `
+      <div class="hero-bg" style="background-image:url('${escapeHtml(h.coverUrl)}')"></div>
+      <div class="hero-inner">
+        <img class="hero-cover" src="${escapeHtml(h.coverUrl)}" alt="">
+        <div class="hero-info">
+          <h1>${escapeHtml(h.title)}</h1>
+          <div class="hero-genres">${escapeHtml([h.years, ...(h.genres || []).slice(0, 3)].filter(Boolean).join(' • '))}</div>
+          <p class="hero-desc">${escapeHtml(h.description || '')}</p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="/watch?slug=${encodeURIComponent(h.slug)}&season=1&episode=1&title=${encodeURIComponent(h.title)}">▶ Ansehen</a>
+            <a class="btn" href="${url}">Details</a>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function addRow(title, items, optsFor) {
+    if (!items || !items.length) return null;
+    const sec = document.createElement('section');
+    sec.className = 'row-section';
+    sec.innerHTML = `<h2 class="row-title">${escapeHtml(title)}</h2><div class="row"></div>`;
+    const row = sec.querySelector('.row');
+    items.forEach((it) => row.appendChild(renderCard(it, optsFor ? optsFor(it, sec) : {})));
+    rowsEl.appendChild(sec);
+    return sec;
+  }
+
+  function fmtResume(p) {
+    return `S${p.season}E${p.episode}`;
+  }
+
+  async function loadHome() {
+    rowsEl.innerHTML = '<section class="row-section"><div class="row">' + Array(8).fill('<div class="skeleton" style="flex:0 0 160px"></div>').join('') + '</div></section>';
+    const [progress, home] = await Promise.all([
+      fetch('/api/progress').then((r) => r.json()).catch(() => []),
+      fetch('/api/home').then((r) => r.json()).catch(() => null),
+    ]);
+    rowsEl.innerHTML = '';
+    if (home) renderHero(home.hero); else heroEl.remove();
+
+    if (Array.isArray(progress) && progress.length) {
+      addRow('Weiterschauen', progress, (p, sec) => ({
+        meta: fmtResume(p),
+        progress: p.duration > 0 ? p.position / p.duration : 0,
+        href: `/watch?slug=${encodeURIComponent(p.slug)}&season=${p.season}&episode=${p.episode}&title=${encodeURIComponent(p.title)}&t=${Math.floor(p.position)}`,
+        onRemove: (card) => {
+          fetch('/api/progress/' + encodeURIComponent(p.slug), { method: 'DELETE' }).catch(() => {});
+          card.remove();
+          if (!sec.querySelector('.card')) sec.remove();
+        },
+      }));
+    }
+    if (home) {
+      addRow('Neu im Katalog', home.newest);
+      (home.rows || []).forEach((r) => addRow(r.genre, r.items));
+    }
+  }
+
+  window.addEventListener('scroll', () => {
+    document.querySelector('.topnav').classList.toggle('scrolled', window.scrollY > 40);
+  }, { passive: true });
+
+  loadHome();
+
 })();

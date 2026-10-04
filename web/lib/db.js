@@ -78,6 +78,26 @@ db.exec(`
     created_at INTEGER NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS sessions (
+    id TEXT PRIMARY KEY,
+    sub TEXT NOT NULL,
+    name TEXT,
+    email TEXT,
+    groups TEXT,
+    expires_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS watch_progress (
+    user_id TEXT NOT NULL,
+    slug TEXT NOT NULL,
+    season INTEGER NOT NULL,
+    episode INTEGER NOT NULL,
+    position REAL NOT NULL DEFAULT 0,
+    duration REAL NOT NULL DEFAULT 0,
+    updated_at INTEGER NOT NULL,
+    PRIMARY KEY (user_id, slug)
+  );
+
   CREATE TABLE IF NOT EXISTS meta (
     key TEXT PRIMARY KEY,
     value TEXT
@@ -381,7 +401,120 @@ function setCachedStream(cacheKey, m3u8) {
   ).run(cacheKey, m3u8, now());
 }
 
+// --- Sessions ---
+function createSession(id, user, expiresAt) {
+  db.prepare(
+    `INSERT INTO sessions (id, sub, name, email, groups, expires_at) VALUES (?, ?, ?, ?, ?, ?)`
+  ).run(id, user.sub, user.name || null, user.email || null, JSON.stringify(user.groups || []), expiresAt);
+}
+
+function getSession(id) {
+  const r = db.prepare('SELECT * FROM sessions WHERE id = ?').get(id);
+  if (!r) return null;
+  if (r.expires_at < now()) {
+    db.prepare('DELETE FROM sessions WHERE id = ?').run(id);
+    return null;
+  }
+  return { sub: r.sub, name: r.name, email: r.email, groups: JSON.parse(r.groups || '[]') };
+}
+
+function deleteSession(id) {
+  db.prepare('DELETE FROM sessions WHERE id = ?').run(id);
+}
+
+function purgeSessions() {
+  db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(now());
+}
+
+// --- Watch Progress (pro Nutzer, eine Zeile pro Serie) ---
+function saveProgress(userId, slug, season, episode, position, duration) {
+  db.prepare(
+    `INSERT INTO watch_progress (user_id, slug, season, episode, position, duration, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(user_id, slug) DO UPDATE SET season = excluded.season, episode = excluded.episode,
+       position = excluded.position, duration = excluded.duration, updated_at = excluded.updated_at`
+  ).run(userId, slug, season, episode, position, duration, now());
+}
+
+function listProgress(userId, limit = 20) {
+  return db
+    .prepare(
+      `SELECT p.slug, p.season, p.episode, p.position, p.duration, p.updated_at, s.title, s.cover_url
+       FROM watch_progress p LEFT JOIN series s ON s.slug = p.slug
+       WHERE p.user_id = ? ORDER BY p.updated_at DESC LIMIT ?`
+    )
+    .all(userId, limit)
+    .map((r) => ({
+      slug: r.slug,
+      title: r.title || r.slug,
+      coverUrl: r.cover_url,
+      season: r.season,
+      episode: r.episode,
+      position: r.position,
+      duration: r.duration,
+      updatedAt: r.updated_at,
+    }));
+}
+
+function deleteProgress(userId, slug) {
+  db.prepare('DELETE FROM watch_progress WHERE user_id = ? AND slug = ?').run(userId, slug);
+}
+
+// --- Startseite ---
+function rowToCard(r) {
+  return {
+    slug: r.slug,
+    title: r.title,
+    coverUrl: r.cover_url,
+    description: r.description,
+    genres: r.genres ? JSON.parse(r.genres) : [],
+    years: r.years,
+  };
+}
+
+function randomHero() {
+  const r = db
+    .prepare(
+      `SELECT slug, title, cover_url, description, genres, years FROM series
+       WHERE cover_url IS NOT NULL AND cover_url != '' AND length(description) > 40
+       ORDER BY RANDOM() LIMIT 1`
+    )
+    .get();
+  return r ? rowToCard(r) : null;
+}
+
+function newestSeries(limit = 20) {
+  return db
+    .prepare(
+      `SELECT slug, title, cover_url, description, genres, years FROM series
+       WHERE cover_url IS NOT NULL AND cover_url != '' ORDER BY rowid DESC LIMIT ?`
+    )
+    .all(limit)
+    .map(rowToCard);
+}
+
+function seriesByGenre(genre, limit = 20) {
+  return db
+    .prepare(
+      `SELECT slug, title, cover_url, description, genres, years FROM series
+       WHERE genres LIKE ? AND cover_url IS NOT NULL AND cover_url != ''
+       ORDER BY RANDOM() LIMIT ?`
+    )
+    .all(`%"${genre}"%`, limit)
+    .map(rowToCard);
+}
+
 module.exports = {
+  createSession,
+  getSession,
+  deleteSession,
+  purgeSessions,
+  saveProgress,
+  listProgress,
+  deleteProgress,
+  randomHero,
+  newestSeries,
+  seriesByGenre,
   db,
   TTL,
   getMeta,

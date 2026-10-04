@@ -34,4 +34,16 @@
       setState(false);
     }
   })();
+
+  fetch('/api/me').then((r) => r.json()).then((me) => {
+    if (!me.authEnabled) return;
+    const u = document.createElement('a');
+    u.className = 'ext-status user-chip';
+    u.href = '/auth/logout';
+    u.title = 'Abmelden';
+    u.textContent = (me.name || me.email || 'Konto') + ' ⎋';
+    nav.appendChild(u);
+    el.style.marginLeft = 'auto';
+    u.style.marginLeft = '0';
+  }).catch(() => {});
 })();

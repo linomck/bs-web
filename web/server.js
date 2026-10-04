@@ -23,12 +23,18 @@ const voe = require('./lib/voe');
 const capsolver = require('./lib/capsolver');
 const tvmaze = require('./lib/tvmaze');
 const { handleHlsProxy } = require('./lib/hls-proxy');
+const auth = require('./lib/auth');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.set('trust proxy', 1);
 app.use(express.json());
+app.use(auth.attachUser);
+app.get('/auth/login', auth.login);
+app.get('/auth/callback', auth.callback);
+app.get('/auth/logout', auth.logout);
+app.use(auth.requireUser);
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ---------------------------------------------------------------------------
@@ -392,7 +398,52 @@ app.get('/api/episode-info', (req, res) => {
     episode,
     episodeUrl: episode.voeUrl || episode.bsUrl,
     nextEpisode: findNextEpisode(slug, season, number),
+    captchaToken: auth.createCaptchaToken(req.user),
   });
+});
+
+app.get('/api/me', (req, res) => {
+  res.json({ name: req.user.name, email: req.user.email, authEnabled: auth.enabled });
+});
+
+// --- Verlauf / Weiterschauen (pro Nutzer) ---
+app.get('/api/progress', (req, res) => {
+  res.json(db.listProgress(req.user.sub, 20));
+});
+
+app.put('/api/progress', (req, res) => {
+  const { slug } = req.body || {};
+  const season = parseInt(req.body.season, 10);
+  const episode = parseInt(req.body.episode, 10);
+  const position = Number(req.body.position);
+  const duration = Number(req.body.duration);
+  if (!slug || !Number.isFinite(season) || !Number.isFinite(episode) || !Number.isFinite(position) || position < 0) {
+    res.status(400).json({ error: 'Ungültige Daten.' });
+    return;
+  }
+  db.saveProgress(req.user.sub, String(slug).slice(0, 200), season, episode, position, Number.isFinite(duration) ? duration : 0);
+  res.json({ ok: true });
+});
+
+app.delete('/api/progress/:slug', (req, res) => {
+  db.deleteProgress(req.user.sub, req.params.slug);
+  res.json({ ok: true });
+});
+
+// --- Startseite ---
+app.get('/api/home', async (req, res) => {
+  await ensureCatalogSynced();
+  try {
+    const genres = db.listGenres(12).map((g) => g.genre);
+    const picks = genres.sort(() => Math.random() - 0.5).slice(0, 4);
+    res.json({
+      hero: db.randomHero(),
+      newest: db.newestSeries(20),
+      rows: picks.map((g) => ({ genre: g, items: db.seriesByGenre(g, 20) })),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 const captchaHits = new Map(); // ip -> [timestamps]
@@ -400,13 +451,18 @@ app.options('/api/captcha', (req, res) => {
   res.set({
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   });
   res.sendStatus(204);
 });
 
 app.post('/api/captcha', async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
+  const bearer = (req.headers.authorization || '').replace(/^Bearer /, '');
+  if (!req.user && !auth.verifyCaptchaToken(bearer)) {
+    res.status(401).json({ error: 'Nicht angemeldet.' });
+    return;
+  }
   const { pageUrl, sitekey } = req.body || {};
   let host;
   try { host = new URL(pageUrl).hostname; } catch (e) { /* ungültig */ }
