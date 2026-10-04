@@ -64,6 +64,7 @@ function parseEpisodePage(html) {
 async function fetchTicket(apiBase, pageUrl, sitekey) {
   const r = await fetch(apiBase + '/api/captcha', {
     method: 'POST',
+    credentials: 'include', // OIDC-Session-Cookie der N2nd-Domain mitsenden
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ pageUrl, sitekey }),
   });
