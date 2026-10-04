@@ -203,32 +203,36 @@ app.get('/api/series/:slug', async (req, res) => {
   }
 });
 
+// Lädt eine Staffel (falls veraltet/fehlend) von BS + TVmaze in die DB.
+async function ensureSeasonLoaded(slug, season) {
+  if (!db.isSeasonStale(slug, season)) return;
+  const episodes = await scraper.fetchSeason(slug, season);
+
+  const series = db.getSeries(slug);
+  const tv = await tvmaze.fetchTvmazeMetadata((series && series.title) || slug);
+
+  const enriched = episodes.map((ep) => {
+    const tvEp = tv && tv.episodes ? tv.episodes[`${season}_${ep.number}`] : null;
+    return {
+      ...ep,
+      thumbnail: ep.thumbnail || (tvEp && tvEp.thumbnail) || null,
+      summary: ep.summary || (tvEp && tvEp.summary) || null,
+    };
+  });
+
+  db.saveSeasonEpisodes(slug, season, enriched);
+
+  if (tv && tv.coverUrl && series && !series.coverUrl) {
+    db.upsertSeries({ ...series, coverUrl: tv.coverUrl, updatedAt: series.updatedAt });
+  }
+}
+
 app.get('/api/series/:slug/season/:num', async (req, res) => {
   const { slug } = req.params;
   const season = parseInt(req.params.num, 10) || 1;
 
   try {
-    if (db.isSeasonStale(slug, season)) {
-      const episodes = await scraper.fetchSeason(slug, season);
-
-      const series = db.getSeries(slug);
-      const tv = await tvmaze.fetchTvmazeMetadata((series && series.title) || slug);
-
-      const enriched = episodes.map((ep) => {
-        const tvEp = tv && tv.episodes ? tv.episodes[`${season}_${ep.number}`] : null;
-        return {
-          ...ep,
-          thumbnail: ep.thumbnail || (tvEp && tvEp.thumbnail) || null,
-          summary: ep.summary || (tvEp && tvEp.summary) || null,
-        };
-      });
-
-      db.saveSeasonEpisodes(slug, season, enriched);
-
-      if (tv && tv.coverUrl && series && !series.coverUrl) {
-        db.upsertSeries({ ...series, coverUrl: tv.coverUrl, updatedAt: series.updatedAt });
-      }
-    }
+    await ensureSeasonLoaded(slug, season);
 
     res.json(db.getSeasonEpisodes(slug, season));
   } catch (err) {
@@ -240,9 +244,13 @@ app.get('/api/series/:slug/season/:num', async (req, res) => {
 // API: Stream-Resolver (Episodenseite -> CapSolver -> embed.php -> VOE -> M3U8)
 // ---------------------------------------------------------------------------
 async function resolveEpisodeStream(slug, season, number) {
-  const episode = db.getEpisode(slug, season, number);
+  let episode = db.getEpisode(slug, season, number);
   if (!episode || !episode.bsUrl) {
-    throw new Error('Episode nicht im Cache gefunden. Bitte zuerst Staffel laden.');
+    await ensureSeasonLoaded(slug, season);
+    episode = db.getEpisode(slug, season, number);
+  }
+  if (!episode || !episode.bsUrl) {
+    throw new Error('Episode nicht gefunden.');
   }
 
   const cacheKey = `${slug}_${season}_${number}`;
@@ -385,13 +393,26 @@ app.get('/api/config', (req, res) => {
   res.json({ hlsProxy: HLS_PROXY_ENABLED, extensionId: process.env.EXTENSION_ID || 'cglglgifbklakfciiiaoiaofldpckgoj' });
 });
 
-app.get('/api/episode-info', (req, res) => {
+app.get('/api/episode-info', async (req, res) => {
   const { slug } = req.query;
   const season = parseInt(req.query.season, 10);
   const number = parseInt(req.query.episode, 10);
-  const episode = slug && db.getEpisode(slug, season, number);
+  if (!slug) {
+    res.status(400).json({ error: 'slug fehlt.' });
+    return;
+  }
+  let episode = db.getEpisode(slug, season, number);
   if (!episode || !episode.bsUrl) {
-    res.status(404).json({ error: 'Episode nicht im Cache. Bitte zuerst Staffel laden.' });
+    try {
+      await ensureSeasonLoaded(slug, season);
+    } catch (err) {
+      res.status(502).json({ error: 'Konnte Staffel nicht laden: ' + err.message });
+      return;
+    }
+    episode = db.getEpisode(slug, season, number);
+  }
+  if (!episode || !episode.bsUrl) {
+    res.status(404).json({ error: 'Episode nicht gefunden.' });
     return;
   }
   res.json({
