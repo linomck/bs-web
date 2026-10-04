@@ -34,17 +34,19 @@
           if (onStatus) onStatus(m.step);
         } else if (m.done) {
           finished = true;
-          port.disconnect();
+          try { port.disconnect(); } catch (e) { /* ignorieren */ }
           resolve(m.m3u8);
         } else {
           finished = true;
-          port.disconnect();
+          try { port.disconnect(); } catch (e) { /* ignorieren */ }
           reject(new Error(m.error || 'Extension-Fehler'));
         }
       });
       port.onDisconnect.addListener(() => {
         if (!finished) reject(new Error('Verbindung zur Extension abgebrochen'));
       });
+      const leave = () => { try { port.disconnect(); } catch (e) { /* ignorieren */ } };
+      window.addEventListener('pagehide', leave, { once: true });
       port.postMessage({ type: 'resolve', episodeUrl, token });
     });
   }
