@@ -29,6 +29,7 @@
         return reject(e);
       }
       port.onMessage.addListener((m) => {
+        if (m.ping) return;
         if (m.step) {
           if (onStatus) onStatus(m.step);
         } else if (m.done) {
@@ -79,7 +80,11 @@
     const info = await infoResp.json();
     if (!infoResp.ok) throw new Error(info.error || `HTTP ${infoResp.status}`);
     say('Anfrage wird an Extension gesendet...');
-    const m3u8 = await extResolve(info.episodeUrl, info.captchaToken, say);
+    const m3u8 = await extResolve(info.episodeUrl, info.captchaToken, say).catch((e) => {
+      if (!/abgebrochen/.test(e.message)) throw e;
+      say('Verbindung abgebrochen – neuer Versuch...');
+      return extResolve(info.episodeUrl, info.captchaToken, say);
+    });
     return { directM3u8: m3u8, m3u8: proxyUrlFor(m3u8), episode: info.episode, nextEpisode: info.nextEpisode };
   }
 

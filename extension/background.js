@@ -129,10 +129,15 @@ chrome.runtime.onMessageExternal.addListener((msg, sender, sendResponse) => {
 // Streaming-Variante mit Fortschritt: Port-Verbindung von der Webseite.
 chrome.runtime.onConnectExternal.addListener((port) => {
   const origin = port.sender && port.sender.origin;
+  // Heartbeat: Nachrichten über den Port halten den MV3-Service-Worker wach
+  // (Captcha kann >30s dauern, sonst wird der Worker beendet).
+  const beat = setInterval(() => { try { port.postMessage({ ping: true }); } catch (e) { clearInterval(beat); } }, 10000);
+  port.onDisconnect.addListener(() => clearInterval(beat));
   port.onMessage.addListener((msg) => {
     if (!msg || msg.type !== 'resolve' || !origin) return;
     resolveEpisode(msg.episodeUrl, origin, (text) => port.postMessage({ step: text }), msg.token)
       .then((m3u8) => port.postMessage({ done: true, m3u8 }))
-      .catch((e) => port.postMessage({ done: false, error: e.message }));
+      .catch((e) => port.postMessage({ done: false, error: e.message }))
+      .finally(() => clearInterval(beat));
   });
 });
