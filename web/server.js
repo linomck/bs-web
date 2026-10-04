@@ -33,8 +33,6 @@ app.use(express.json());
 app.use(auth.attachUser);
 app.get('/auth/login', auth.login);
 app.get('/auth/callback', auth.callback);
-app.get('/auth/logout', auth.logout);
-app.get('/auth/logged-out', auth.loggedOut);
 app.use(auth.requireUser);
 app.use(express.static(path.join(__dirname, 'public')));
 

@@ -84,7 +84,7 @@ function attachUser(req, res, next) {
 /** Schützt alles außer /auth/* und token-geschütztem /api/captcha. */
 function requireUser(req, res, next) {
   if (req.user) return next();
-  if (req.path.startsWith('/auth/') || req.path === '/api/captcha' || req.path === '/theme.css') return next();
+  if (req.path.startsWith('/auth/') || req.path === '/api/captcha') return next();
   if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'Nicht angemeldet.' });
   return res.redirect('/auth/login?next=' + encodeURIComponent(safeNext(req.originalUrl)));
 }
@@ -157,21 +157,6 @@ async function callback(req, res) {
   }
 }
 
-function logout(req, res) {
-  const sid = parseCookies(req)[COOKIE];
-  if (sid) db.deleteSession(sid);
-  setCookie(res, COOKIE, '', 0);
-  res.redirect('/auth/logged-out');
-}
-
-function loggedOut(req, res) {
-  res.send(`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>N2nd</title>
-<meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/theme.css"></head>
-<body style="display:flex;min-height:100vh;align-items:center;justify-content:center;flex-direction:column;gap:18px">
-<h1 style="font-size:28px;letter-spacing:-0.03em">Abgemeldet</h1>
-<a class="btn" href="/auth/login?prompt=login">Erneut anmelden</a></body></html>`);
-}
-
 // --- Kurzlebiges Token für /api/captcha (Extension sendet es als Bearer) ---
 function createCaptchaToken(user) {
   const payload = Buffer.from(JSON.stringify({ s: user.sub, e: Date.now() + 15 * 60 * 1000 })).toString('base64url');
@@ -191,4 +176,4 @@ function verifyCaptchaToken(token) {
 
 setInterval(() => db.purgeSessions(), 60 * 60 * 1000).unref();
 
-module.exports = { loggedOut, enabled, attachUser, requireUser, login, callback, logout, createCaptchaToken, verifyCaptchaToken };
+module.exports = { enabled, attachUser, requireUser, login, callback, createCaptchaToken, verifyCaptchaToken };

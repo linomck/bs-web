@@ -280,7 +280,6 @@ a {
   color: var(--text-dim);
   white-space: nowrap;
 }
-.user-chip:hover { color: #fff; }
 .user-chip .avatar {
   width: 30px;
   height: 30px;

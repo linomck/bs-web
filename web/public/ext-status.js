@@ -38,10 +38,8 @@
   fetch('/api/me').then((r) => r.json()).then((me) => {
     if (!me.authEnabled) return;
     const label = me.name || me.email || 'Konto';
-    const u = document.createElement('a');
+    const u = document.createElement('div');
     u.className = 'user-chip';
-    u.href = '/auth/logout';
-    u.title = 'Abmelden';
     const ini = document.createElement('span');
     ini.className = 'avatar';
     ini.textContent = label.trim().slice(0, 1).toUpperCase();
