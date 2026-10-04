@@ -155,13 +155,51 @@
     }
   }
 
+  // ---------- Such-Screen ----------
+  const searchScreen = document.getElementById('search-screen');
+  const searchResults = document.getElementById('search-results');
+  const searchTitle = document.getElementById('search-title');
+  let searchSeq = 0;
+
+  function closeSearch() {
+    searchSeq++;
+    searchScreen.classList.add('hidden');
+    document.body.style.overflow = '';
+  }
+
+  async function runSearch(q) {
+    const seq = ++searchSeq;
+    searchScreen.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+    searchTitle.textContent = `Ergebnisse für „${q}"`;
+    searchResults.innerHTML = Array(12).fill('<div class="skeleton"></div>').join('');
+    try {
+      const params = new URLSearchParams({ q, page: 1, pageSize: 96 });
+      const data = await (await fetch(`/api/catalog?${params}`)).json();
+      if (seq !== searchSeq) return;
+      searchResults.innerHTML = '';
+      if (!data.items || !data.items.length) {
+        searchResults.innerHTML = '<div class="state-message">Keine Serien gefunden.</div>';
+        return;
+      }
+      data.items.forEach((item) => searchResults.appendChild(renderCard(item)));
+    } catch (err) {
+      if (seq === searchSeq) searchResults.innerHTML = `<div class="state-message">Fehler: ${escapeHtml(err.message)}</div>`;
+    }
+  }
+
   searchInput.addEventListener('input', (e) => {
     clearTimeout(searchDebounce);
-    searchDebounce = setTimeout(() => {
-      state.q = e.target.value.trim();
-      state.page = 1;
-      loadCatalog();
-    }, 350);
+    const q = e.target.value.trim();
+    if (!q) return closeSearch();
+    searchDebounce = setTimeout(() => runSearch(q), 300);
+  });
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      searchInput.value = '';
+      closeSearch();
+      searchInput.blur();
+    }
   });
 
   loadGenres();
