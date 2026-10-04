@@ -270,3 +270,32 @@ a {
   cursor: pointer;
 }
 .ext-status.ok { cursor: default; color: rgba(255, 255, 255, 0.9); }
+
+/* Nutzer (ohne Button-Hintergrund) */
+.user-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.user-chip:hover { color: #fff; }
+.user-chip .avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--border);
+  font-weight: 600;
+  color: #fff;
+}
+
+/* Einheitliche Kartengröße */
+.card { min-width: 0; }
+.grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+.card-cover img { aspect-ratio: 2 / 3; }

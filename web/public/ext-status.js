@@ -37,13 +37,25 @@
 
   fetch('/api/me').then((r) => r.json()).then((me) => {
     if (!me.authEnabled) return;
+    const label = me.name || me.email || 'Konto';
     const u = document.createElement('a');
-    u.className = 'ext-status user-chip';
+    u.className = 'user-chip';
     u.href = '/auth/logout';
     u.title = 'Abmelden';
-    u.textContent = (me.name || me.email || 'Konto') + ' ⎋';
+    const ini = document.createElement('span');
+    ini.className = 'avatar';
+    ini.textContent = label.trim().slice(0, 1).toUpperCase();
+    u.appendChild(ini);
+    if (me.picture) {
+      const img = new Image();
+      img.className = 'avatar';
+      img.alt = '';
+      img.onload = () => ini.replaceWith(img);
+      img.src = me.picture;
+    }
+    const t = document.createElement('span');
+    t.textContent = label;
+    u.appendChild(t);
     nav.appendChild(u);
-    el.style.marginLeft = 'auto';
-    u.style.marginLeft = '0';
   }).catch(() => {});
 })();

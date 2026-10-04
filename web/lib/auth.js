@@ -84,7 +84,7 @@ function attachUser(req, res, next) {
 /** Schützt alles außer /auth/* und token-geschütztem /api/captcha. */
 function requireUser(req, res, next) {
   if (req.user) return next();
-  if (req.path.startsWith('/auth/') || req.path === '/api/captcha') return next();
+  if (req.path.startsWith('/auth/') || req.path === '/api/captcha' || req.path === '/theme.css') return next();
   if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'Nicht angemeldet.' });
   return res.redirect('/auth/login?next=' + encodeURIComponent(safeNext(req.originalUrl)));
 }
@@ -105,6 +105,7 @@ async function login(req, res) {
         nonce,
         code_challenge: generators.codeChallenge(verifier),
         code_challenge_method: 'S256',
+        ...(req.query.prompt === 'login' ? { prompt: 'login' } : {}),
       })
     );
   } catch (err) {
@@ -144,7 +145,7 @@ async function callback(req, res) {
     const sid = crypto.randomBytes(32).toString('base64url');
     db.createSession(
       sid,
-      { sub: claims.sub, name: claims.name || claims.preferred_username || null, email: claims.email || null, groups },
+      { sub: claims.sub, name: claims.name || claims.preferred_username || null, email: claims.email || null, picture: claims.picture || null, groups },
       Date.now() + SESSION_TTL
     );
     setCookie(res, COOKIE, sid, SESSION_TTL / 1000);
@@ -160,7 +161,15 @@ function logout(req, res) {
   const sid = parseCookies(req)[COOKIE];
   if (sid) db.deleteSession(sid);
   setCookie(res, COOKIE, '', 0);
-  res.redirect('/auth/login');
+  res.redirect('/auth/logged-out');
+}
+
+function loggedOut(req, res) {
+  res.send(`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>N2nd</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/theme.css"></head>
+<body style="display:flex;min-height:100vh;align-items:center;justify-content:center;flex-direction:column;gap:18px">
+<h1 style="font-size:28px;letter-spacing:-0.03em">Abgemeldet</h1>
+<a class="btn" href="/auth/login?prompt=login">Erneut anmelden</a></body></html>`);
 }
 
 // --- Kurzlebiges Token für /api/captcha (Extension sendet es als Bearer) ---
@@ -182,4 +191,4 @@ function verifyCaptchaToken(token) {
 
 setInterval(() => db.purgeSessions(), 60 * 60 * 1000).unref();
 
-module.exports = { enabled, attachUser, requireUser, login, callback, logout, createCaptchaToken, verifyCaptchaToken };
+module.exports = { loggedOut, enabled, attachUser, requireUser, login, callback, logout, createCaptchaToken, verifyCaptchaToken };

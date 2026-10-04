@@ -104,6 +104,8 @@ db.exec(`
   );
 `);
 
+try { db.exec('ALTER TABLE sessions ADD COLUMN picture TEXT'); } catch (e) { /* existiert */ }
+
 // --- TTL Konstanten (Millisekunden) ---
 const TTL = {
   CATALOG: 24 * 60 * 60 * 1000,
@@ -404,8 +406,8 @@ function setCachedStream(cacheKey, m3u8) {
 // --- Sessions ---
 function createSession(id, user, expiresAt) {
   db.prepare(
-    `INSERT INTO sessions (id, sub, name, email, groups, expires_at) VALUES (?, ?, ?, ?, ?, ?)`
-  ).run(id, user.sub, user.name || null, user.email || null, JSON.stringify(user.groups || []), expiresAt);
+    `INSERT INTO sessions (id, sub, name, email, groups, picture, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
+  ).run(id, user.sub, user.name || null, user.email || null, JSON.stringify(user.groups || []), user.picture || null, expiresAt);
 }
 
 function getSession(id) {
@@ -415,7 +417,7 @@ function getSession(id) {
     db.prepare('DELETE FROM sessions WHERE id = ?').run(id);
     return null;
   }
-  return { sub: r.sub, name: r.name, email: r.email, groups: JSON.parse(r.groups || '[]') };
+  return { sub: r.sub, name: r.name, email: r.email, picture: r.picture, groups: JSON.parse(r.groups || '[]') };
 }
 
 function deleteSession(id) {

@@ -34,6 +34,7 @@ app.use(auth.attachUser);
 app.get('/auth/login', auth.login);
 app.get('/auth/callback', auth.callback);
 app.get('/auth/logout', auth.logout);
+app.get('/auth/logged-out', auth.loggedOut);
 app.use(auth.requireUser);
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -424,7 +425,7 @@ app.get('/api/episode-info', async (req, res) => {
 });
 
 app.get('/api/me', (req, res) => {
-  res.json({ name: req.user.name, email: req.user.email, authEnabled: auth.enabled });
+  res.json({ name: req.user.name, email: req.user.email, picture: req.user.picture || null, authEnabled: auth.enabled });
 });
 
 // --- Verlauf / Weiterschauen (pro Nutzer) ---

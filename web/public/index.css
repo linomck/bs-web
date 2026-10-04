@@ -87,7 +87,7 @@
   scrollbar-width: none;
 }
 .row::-webkit-scrollbar { display: none; }
-.row .card { flex: 0 0 160px; scroll-snap-align: start; }
+.row .card { flex: 0 0 160px; width: 160px; scroll-snap-align: start; }
 
 /* Karten */
 .card-cover { position: relative; border-radius: 14px; aspect-ratio: 2 / 3; }
