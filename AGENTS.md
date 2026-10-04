@@ -60,6 +60,7 @@ watch.js ── GET /api/episode-info ──► {episodeUrl, nextEpisode}
 extension: Episodenseite (Cookie-Jar des Browsers) -> POST {server}/api/captcha (CapSolver) -> embed.php -> VOE -> MKGMa -> M3U8
 watch.js ── hls.js direkt aufs VOE-CDN (Proxy /api/hls bleibt Fallback)
 ```
+Das VOE-CDN sendet keine CORS-Header; die Extension ergänzt sie per `declarativeNetRequest` (`extension/rules.json`, nur für Requests mit Initiator `stream.n2nd.de`/`localhost`). Bei anderer Domain `initiatorDomains` anpassen.
 Ohne Extension oder bei Fehler: Fallback auf `POST /api/resolve` (alles serverseitig). `GET /api/config` liefert die Extension-ID (Env `EXTENSION_ID`, Default = ID aus dem `key` im Manifest). `externally_connectable` in `extension/manifest.json` muss die Web-Domain enthalten. `/api/captcha` ist auf BS-Hosts + Sitekey-Format beschränkt und rate-limitiert (10/min/IP). Preload läuft im Hybrid-Modus clientseitig über die Extension. Installation: `chrome://extensions` -> Entwicklermodus -> "Entpackte Erweiterung laden" -> `extension/`.
 
 API-Endpunkte: `GET /api/catalog`, `GET /api/genres`, `GET /api/series/:slug`, `GET /api/series/:slug/season/:num`, `POST /api/resolve`, `POST /api/preload`, `GET /api/preload/status`, `GET /api/hls`, `GET /api/config`, `GET /api/episode-info`, `POST /api/captcha`. Seiten: `/`, `/serie/:slug`, `/watch`.
