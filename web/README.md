@@ -1,4 +1,4 @@
-# BS Web
+# N2nd
 
 Standalone Katalog & Player für Burning Series — kein Browser-Plugin nötig.
 Portiert aus der `bs-autowatch` Chrome-Extension (siehe `../AGENTS.md` für die

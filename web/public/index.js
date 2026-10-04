@@ -1,5 +1,5 @@
 /**
- * BS Web - Katalog Frontend
+ * N2nd - Katalog Frontend
  * Live-Suche (debounced), Genre-Filter, paginiertes Cover-Grid.
  */
 

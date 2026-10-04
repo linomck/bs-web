@@ -1,5 +1,5 @@
 /**
- * BS Web - Serien-Detailseite
+ * N2nd - Serien-Detailseite
  * Zeigt Beschreibung/Genres/Cast, Staffel-Tabs und Episodenliste mit Thumbnails.
  * Klick auf eine Episode navigiert zum Player (/watch?slug=...&season=...&episode=...).
  */
@@ -78,7 +78,13 @@
           episode: ep.number,
           title: seriesData ? seriesData.title : slug,
         });
-        window.location.href = `/watch?${params.toString()}`;
+        BSResolver.showLoading('Video wird geladen...', `Staffel ${ep.season} • Folge ${ep.number} – ${ep.title || ''}`);
+        BSResolver.resolveAndStash(slug, ep.season, ep.number)
+          .then(() => { window.location.href = `/watch?${params.toString()}`; })
+          .catch((err) => {
+            BSResolver.hideLoading();
+            alert('Video konnte nicht geladen werden: ' + err.message);
+          });
       });
 
       const thumbHtml = ep.thumbnail
@@ -115,7 +121,7 @@
       if (!resp.ok) throw new Error('Serie nicht gefunden');
       seriesData = await resp.json();
 
-      document.title = `${seriesData.title} - BS Web`;
+      document.title = `${seriesData.title} - N2nd`;
       renderHero(seriesData);
 
       const seasons = seriesData.seasons && seriesData.seasons.length ? seriesData.seasons : [1];

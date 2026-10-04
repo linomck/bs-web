@@ -1,5 +1,5 @@
 /**
- * BS Web - CapSolver Client
+ * N2nd - CapSolver Client
  * Löst reCAPTCHA v2 Challenges auf der Burning-Series-Episodenseite via
  * ReCaptchaV2TaskProxyLess (siehe AGENTS.md, CapSolver-Integration aus background.js portiert).
  */

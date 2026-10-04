@@ -3,8 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BS Web Player</title>
+  <title>N2nd Player</title>
   <link rel="stylesheet" href="/watch.css">
+  <link rel="stylesheet" href="/loading.css">
   <script src="/hls.min.js"></script>
 </head>
 <body>
@@ -12,9 +13,14 @@
     <video id="video-element" playsinline></video>
 
     <header class="top-overlay" id="top-overlay">
+      <div class="top-left">
+      <a id="btn-back" class="icon-btn back-btn" href="/" title="Zurück zur Serie (Esc)">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+      </a>
       <div class="episode-meta">
         <h1 id="series-title">Wird geladen...</h1>
         <h2 id="episode-subtitle">Staffel 1 - Folge 1</h2>
+      </div>
       </div>
 
       <div class="top-actions">
@@ -22,17 +28,6 @@
           <span class="spinner-dot"></span>
           <span id="preload-badge-text">Stream wird aufgelöst...</span>
         </div>
-
-        <button id="btn-episodes-top" class="action-btn episodes-btn" title="Alle Folgen anzeigen (Taste E)">
-          <span>☰ Folgen</span>
-          <span class="kbd-hint">E</span>
-        </button>
-
-        <button id="btn-skip-top" class="action-btn skip-btn" title="Nächste Folge abspielen (Taste N)">
-          <span>Folge überspringen</span>
-          <span class="btn-icon">⏭️</span>
-          <span class="kbd-hint">N</span>
-        </button>
       </div>
     </header>
 
@@ -109,7 +104,7 @@
           </button>
 
           <button id="btn-skip-bottom" class="inline-skip-link" title="Nächste Folge (N)">
-            <span>Folge überspringen ⏭️</span>
+            <span>Folge überspringen</span>
           </button>
 
           <select id="playback-speed" class="speed-select" title="Geschwindigkeit">
@@ -133,6 +128,7 @@
     </div>
   </div>
 
+  <script src="/resolver.js"></script>
   <script src="/watch.js"></script>
 </body>
 </html>

@@ -1,5 +1,5 @@
 {
-  "name": "bs-web",
+  "name": "n2nd",
   "version": "1.0.0",
   "description": "Standalone Burning Series Katalog & Player (Node/Express) - portiert aus bs-autowatch",
   "main": "server.js",

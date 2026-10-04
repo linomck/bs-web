@@ -1,5 +1,5 @@
 /**
- * BS Web - Burning Series Scraper
+ * N2nd - Burning Series Scraper
  * Holt Katalog, Serien-Metadaten, Staffel-Episodenlisten und die Episoden-Detailseite
  * (LID / Security-Token / reCAPTCHA-Sitekey) direkt von burningseries.cx (Fallback: bs.to).
  */

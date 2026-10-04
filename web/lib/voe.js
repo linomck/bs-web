@@ -1,5 +1,5 @@
 /**
- * BS Web - VOE Resolver
+ * N2nd - VOE Resolver
  * Lädt die VOE-Hoster-Seite (folgt ggf. einem JS-Redirect-Gate) und entschlüsselt
  * den MKGMa-verschleierten String zur finalen M3U8 Master-Playlist.
  * Algorithmus (siehe AGENTS.md Abschnitt 4): ROT13 -> Underscores entfernen ->

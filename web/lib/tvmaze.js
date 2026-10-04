@@ -1,5 +1,5 @@
 /**
- * BS Web - TVmaze Metadaten
+ * N2nd - TVmaze Metadaten
  * Kostenlose Anreicherung mit Serien-Cover und Episoden-Thumbnails/Beschreibungen
  * (siehe AGENTS.md Abschnitt 5).
  */

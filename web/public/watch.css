@@ -279,7 +279,7 @@ video {
 .controls-group {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 10px;
 }
 
 .icon-btn {
@@ -290,7 +290,10 @@ video {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 7px;
+  width: 34px;
+  height: 34px;
+  box-sizing: border-box;
+  padding: 0;
   border-radius: 8px;
   transition: background 0.15s ease, color 0.15s ease;
 }
@@ -325,7 +328,11 @@ video {
   border: 1px solid rgba(255, 255, 255, 0.15);
   backdrop-filter: blur(20px);
   color: #ffffff;
-  padding: 6px 13px;
+  height: 34px;
+  padding: 0 14px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
   border-radius: 8px;
   font-size: 12px;
   font-weight: 500;
@@ -344,9 +351,11 @@ video {
   color: #ffffff;
   border: 1px solid rgba(255, 255, 255, 0.15);
   backdrop-filter: blur(20px);
-  padding: 5px 8px;
+  height: 34px;
+  box-sizing: border-box;
+  padding: 0 8px;
   border-radius: 8px;
-  font-size: 11.5px;
+  font-size: 12px;
   cursor: pointer;
   outline: none;
 }
@@ -683,4 +692,18 @@ video {
 
 .hidden {
   display: none !important;
+}
+
+.top-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.back-btn {
+  text-decoration: none;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(25px) saturate(180%);
+  -webkit-backdrop-filter: blur(25px) saturate(180%);
+  flex-shrink: 0;
 }

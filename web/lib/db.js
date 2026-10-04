@@ -1,5 +1,5 @@
 /**
- * BS Web - SQLite Datenbank & Cache
+ * N2nd - SQLite Datenbank & Cache
  * Schema für Katalog, Serien, Staffeln, Episoden und aufgelöste Streams.
  * TTLs steuern, wann Daten erneut gescraped werden.
  */

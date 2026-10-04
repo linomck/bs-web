@@ -1,5 +1,5 @@
 /**
- * BS Web - Express Server
+ * N2nd - Express Server
  * Katalog + Serien-API, Stream-Resolver (CapSolver) und HLS-Proxy für den
  * standalone Burning-Series-Katalog & Player.
  */
@@ -27,6 +27,7 @@ const { handleHlsProxy } = require('./lib/hls-proxy');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+app.set('trust proxy', 1);
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -291,6 +292,17 @@ async function resolveEpisodeStream(slug, season, number) {
   return { m3u8, episode, cached: false };
 }
 
+function findNextEpisode(slug, season, number) {
+  const seasonEpisodes = db.getSeasonEpisodes(slug, season);
+  const idx = seasonEpisodes.findIndex((e) => e.number === number);
+  let next = idx >= 0 ? seasonEpisodes[idx + 1] : null;
+  if (!next) {
+    next = db.getSeasonEpisodes(slug, season + 1)[0] || null;
+    if (next) next.season = season + 1;
+  }
+  return next;
+}
+
 app.post('/api/resolve', async (req, res) => {
   const { slug, season, episode } = req.body || {};
   if (!slug || !season || !episode) {
@@ -301,14 +313,7 @@ app.post('/api/resolve', async (req, res) => {
   try {
     const result = await resolveEpisodeStream(slug, parseInt(season, 10), parseInt(episode, 10));
 
-    const seasonEpisodes = db.getSeasonEpisodes(slug, parseInt(season, 10));
-    const currentIdx = seasonEpisodes.findIndex((e) => e.number === parseInt(episode, 10));
-    let next = currentIdx >= 0 ? seasonEpisodes[currentIdx + 1] : null;
-    if (!next) {
-      const nextSeasonEpisodes = db.getSeasonEpisodes(slug, parseInt(season, 10) + 1);
-      next = nextSeasonEpisodes[0] || null;
-      if (next) next.season = parseInt(season, 10) + 1;
-    }
+    const next = findNextEpisode(slug, parseInt(season, 10), parseInt(episode, 10));
 
     res.json({
       m3u8: '/api/hls?u=' + Buffer.from(result.m3u8, 'utf8').toString('base64url'),
@@ -367,9 +372,76 @@ app.get('/api/preload/status', (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// Hybrid: Extension löst Stream beim Nutzer auf, Server liefert nur Metadaten
+// und das reCAPTCHA-Ticket (CapSolver-Key bleibt serverseitig).
+// ---------------------------------------------------------------------------
+app.get('/api/config', (req, res) => {
+  res.json({ hlsProxy: HLS_PROXY_ENABLED, extensionId: process.env.EXTENSION_ID || 'cglglgifbklakfciiiaoiaofldpckgoj' });
+});
+
+app.get('/api/episode-info', (req, res) => {
+  const { slug } = req.query;
+  const season = parseInt(req.query.season, 10);
+  const number = parseInt(req.query.episode, 10);
+  const episode = slug && db.getEpisode(slug, season, number);
+  if (!episode || !episode.bsUrl) {
+    res.status(404).json({ error: 'Episode nicht im Cache. Bitte zuerst Staffel laden.' });
+    return;
+  }
+  res.json({
+    episode,
+    episodeUrl: episode.voeUrl || episode.bsUrl,
+    nextEpisode: findNextEpisode(slug, season, number),
+  });
+});
+
+const captchaHits = new Map(); // ip -> [timestamps]
+app.options('/api/captcha', (req, res) => {
+  res.set({
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+  });
+  res.sendStatus(204);
+});
+
+app.post('/api/captcha', async (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  const { pageUrl, sitekey } = req.body || {};
+  let host;
+  try { host = new URL(pageUrl).hostname; } catch (e) { /* ungültig */ }
+  const allowed = [scraper.PRIMARY_BASE, scraper.FALLBACK_BASE].map((b) => new URL(b).hostname);
+  if (!host || !allowed.includes(host) || !/^6L[\w-]{30,}$/.test(sitekey || '')) {
+    res.status(400).json({ error: 'Ungültige pageUrl/sitekey.' });
+    return;
+  }
+
+  const ip = req.ip;
+  const now = Date.now();
+  const hits = (captchaHits.get(ip) || []).filter((t) => now - t < 60 * 1000);
+  if (hits.length >= 10) {
+    res.status(429).json({ error: 'Zu viele Captcha-Anfragen.' });
+    return;
+  }
+  hits.push(now);
+  captchaHits.set(ip, hits);
+
+  try {
+    res.json({ ticket: await capsolver.solveRecaptchaV2(pageUrl, sitekey) });
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
 // HLS Proxy
 // ---------------------------------------------------------------------------
-app.get('/api/hls', handleHlsProxy);
+const HLS_PROXY_ENABLED = process.env.HLS_PROXY === '1';
+if (HLS_PROXY_ENABLED) {
+  app.get('/api/hls', handleHlsProxy);
+} else {
+  app.get('/api/hls', (req, res) => res.status(404).json({ error: 'HLS-Proxy deaktiviert (HLS_PROXY=1 zum Aktivieren).' }));
+}
 
 // ---------------------------------------------------------------------------
 // Fallback: SPA-Routen (Katalog/Serie/Watch) direkt auf index.html je Seite

@@ -1,5 +1,5 @@
 /**
- * BS Web - Player Frontend
+ * N2nd - Player Frontend
  * Portiert aus player/player.js: hls.js Wiedergabe, Auto-Next mit Countdown,
  * Episoden-Drawer mit Thumbnails, Tastatur-Shortcuts. Chrome-Extension-APIs
  * wurden durch fetch()-Aufrufe gegen die eigene REST-API ersetzt.
@@ -35,10 +35,8 @@
   const iconFsEnter = document.getElementById('icon-fs-enter');
   const iconFsExit = document.getElementById('icon-fs-exit');
 
-  const btnSkipTop = document.getElementById('btn-skip-top');
   const btnSkipBottom = document.getElementById('btn-skip-bottom');
 
-  const btnEpisodesTop = document.getElementById('btn-episodes-top');
   const btnEpisodesBottom = document.getElementById('btn-episodes-bottom');
   const episodesDrawer = document.getElementById('episodes-drawer');
   const btnCloseDrawer = document.getElementById('btn-close-drawer');
@@ -55,6 +53,8 @@
   const btnCountdownCancel = document.getElementById('btn-countdown-cancel');
 
   let hls = null;
+  let hlsProxyEnabled = false;
+  fetch('/api/config').then((r) => r.json()).then((c) => { hlsProxyEnabled = !!c.hlsProxy; }).catch(() => {});
   let currentParams = {};
   let countdownTimer = null;
   let idleTimeout = null;
@@ -105,12 +105,14 @@
    * der CDN die Anfrage z.B. wegen IP-Bindung der signierten URL ablehnt.
    */
   function attachHls(directUrl, proxyUrl) {
+    if (!hlsProxyEnabled) proxyUrl = null;
     if (hls) {
       hls.destroy();
       hls = null;
     }
 
     let usingProxyFallback = !directUrl;
+    if (!directUrl && !proxyUrl) { alert('Kein Stream verfügbar.'); return; }
     const initialUrl = directUrl || proxyUrl;
 
     if (window.Hls && Hls.isSupported()) {
@@ -191,33 +193,37 @@
     }
   }
 
+  const { extCache, resolveViaExtension, resolveStream, showLoading, hideLoading } = window.BSResolver;
+
   /**
    * Löst eine Episode über die eigene API auf (CapSolver -> embed.php -> VOE -> M3U8)
    * und startet die Wiedergabe. Aktualisiert nextEpisode-Zustand.
    */
+  let resolveToken = 0;
   async function resolveAndPlay(slug, season, episode, title) {
     clearTimeout(preloadPollTimer);
+    const myToken = ++resolveToken;
+    cancelCountdown();
+    video.pause();
+    if (hls) {
+      hls.stopLoad();
+    }
     currentParams = { slug, season, episode, title: title || currentParams.title || slug };
     drawerActiveSeason = season;
 
     seriesTitleEl.textContent = currentParams.title;
     episodeSubtitleEl.textContent = `Staffel ${season} • Folge ${episode}`;
-    document.title = `${currentParams.title} S${season}E${episode} - BS Web`;
+    document.title = `${currentParams.title} S${season}E${episode} - N2nd`;
     syncUrl(slug, currentParams.title, season, episode);
+    document.getElementById('btn-back').href = `/serie/${encodeURIComponent(slug)}`;
 
     updatePreloadBadge('loading', 'Stream wird aufgelöst (Captcha + Extraktion)...');
+    showLoading('Video wird geladen...');
 
     try {
-      const resp = await fetch('/api/resolve', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug, season, episode }),
-      });
-      const data = await resp.json();
-
-      if (!resp.ok) {
-        throw new Error(data.error || `HTTP ${resp.status}`);
-      }
+      const data = await resolveStream(slug, season, episode);
+      if (myToken !== resolveToken) return; // inzwischen andere Folge gewählt
+      video.addEventListener('playing', hideLoading, { once: true });
 
       if (data.episode && data.episode.title) {
         currentParams.title = currentParams.title;
@@ -238,6 +244,7 @@
       }
     } catch (err) {
       console.error('[Player] Resolve-Fehler:', err);
+      hideLoading();
       updatePreloadBadge('error', 'Fehler: ' + err.message);
       seriesTitleEl.textContent = currentParams.title + ' — Fehler';
     }
@@ -260,6 +267,21 @@
     const slug = currentParams.slug;
     const season = next.season;
     const episode = next.number;
+
+    if (window.BSResolver.isExtReady()) {
+      const key = `${slug}_${season}_${episode}`;
+      const p = resolveViaExtension(slug, season, episode);
+      extCache.set(key, p);
+      p.then(() => {
+        if (currentParams.nextEpisode && currentParams.nextEpisode.number === episode && currentParams.nextEpisode.season === season) {
+          updatePreloadBadge('ready', `Nächste Folge bereit: S${season}E${episode}`);
+        }
+      }).catch((err) => {
+        extCache.delete(key);
+        updatePreloadBadge('error', `Vorladen fehlgeschlagen: ${err.message}`);
+      });
+      return;
+    }
 
     fetch('/api/preload', {
       method: 'POST',
@@ -397,7 +419,6 @@
     episodesDrawer.classList.add('hidden');
   }
 
-  btnEpisodesTop.addEventListener('click', openEpisodesDrawer);
   btnEpisodesBottom.addEventListener('click', openEpisodesDrawer);
   btnCloseDrawer.addEventListener('click', closeEpisodesDrawer);
 
@@ -513,7 +534,6 @@
     video.playbackRate = parseFloat(e.target.value);
   });
 
-  btnSkipTop.addEventListener('click', skipToNextEpisode);
   btnSkipBottom.addEventListener('click', skipToNextEpisode);
   btnCountdownNow.addEventListener('click', skipToNextEpisode);
   btnCountdownCancel.addEventListener('click', cancelCountdown);

@@ -4,14 +4,14 @@ networks:
     name: ${TRAEFIK_NETWORK:-proxy}
 
 volumes:
-  bs-web-data:
+  n2nd-data:
 
 services:
-  bs-web:
+  n2nd:
     build:
       context: ./web
       dockerfile: Dockerfile
-    container_name: bs-web
+    container_name: n2nd
     restart: unless-stopped
     environment:
       - PORT=3000
@@ -19,13 +19,13 @@ services:
       - BS_BASE_URL=${BS_BASE_URL:-https://burningseries.cx}
       - BS_FALLBACK_URL=${BS_FALLBACK_URL:-https://bs.to}
     volumes:
-      - bs-web-data:/app/data
+      - n2nd-data:/app/data
     networks:
       - traefik
     labels:
       - traefik.enable=true
       - traefik.docker.network=${TRAEFIK_NETWORK:-proxy}
-      - traefik.http.routers.bs-web.rule=Host(`${DOMAIN}`)
-      - traefik.http.routers.bs-web.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}
-      - traefik.http.routers.bs-web.tls.certresolver=${TRAEFIK_CERTRESOLVER:-le}
-      - traefik.http.services.bs-web.loadbalancer.server.port=3000
+      - traefik.http.routers.n2nd.rule=Host(`${DOMAIN}`)
+      - traefik.http.routers.n2nd.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}
+      - traefik.http.routers.n2nd.tls.certresolver=${TRAEFIK_CERTRESOLVER:-le}
+      - traefik.http.services.n2nd.loadbalancer.server.port=3000

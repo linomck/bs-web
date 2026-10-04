@@ -1,4 +1,4 @@
-/* BS Web - Liquid Glass Theme (geteilt zwischen Katalog, Serie und Player)
+/* N2nd - Liquid Glass Theme (geteilt zwischen Katalog, Serie und Player)
    Monochrom, transluzentes Acryl / Frosted Glass, kein Orange. */
 
 * {
@@ -253,3 +253,20 @@ a {
   gap: 10px;
   padding: 20px 32px 60px;
 }
+
+/* Extension-Status (Topnav, rechts) */
+.ext-status {
+  margin-left: auto;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  color: #fff;
+  text-decoration: none;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(25px) saturate(180%);
+  -webkit-backdrop-filter: blur(25px) saturate(180%);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ext-status.ok { cursor: default; color: rgba(255, 255, 255, 0.9); }

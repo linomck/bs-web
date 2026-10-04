@@ -1,5 +1,5 @@
 /**
- * BS Web - HLS Proxy
+ * N2nd - HLS Proxy
  * Reicht Playlists und Segmente von VOE-CDNs durch, damit der Browser sie ohne
  * CORS-/Referer-Probleme laden kann. Playlists werden zeilenweise umgeschrieben,
  * sodass jede referenzierte URI erneut über /api/hls läuft.
