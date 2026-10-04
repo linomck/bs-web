@@ -79,7 +79,7 @@
           title: seriesData ? seriesData.title : slug,
         });
         BSResolver.showLoading('Video wird geladen...', `Staffel ${ep.season} • Folge ${ep.number} – ${ep.title || ''}`);
-        BSResolver.resolveAndStash(slug, ep.season, ep.number)
+        BSResolver.resolveAndStash(slug, ep.season, ep.number, BSResolver.setLoadingStatus)
           .then(() => { window.location.href = `/watch?${params.toString()}`; })
           .catch((err) => {
             BSResolver.hideLoading();

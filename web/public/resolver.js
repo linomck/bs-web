@@ -18,6 +18,35 @@
     });
   }
 
+  function extResolve(episodeUrl, onStatus) {
+    return new Promise((resolve, reject) => {
+      let finished = false;
+      let port;
+      try {
+        port = chrome.runtime.connect(extId);
+      } catch (e) {
+        return reject(e);
+      }
+      port.onMessage.addListener((m) => {
+        if (m.step) {
+          if (onStatus) onStatus(m.step);
+        } else if (m.done) {
+          finished = true;
+          port.disconnect();
+          resolve(m.m3u8);
+        } else {
+          finished = true;
+          port.disconnect();
+          reject(new Error(m.error || 'Extension-Fehler'));
+        }
+      });
+      port.onDisconnect.addListener(() => {
+        if (!finished) reject(new Error('Verbindung zur Extension abgebrochen'));
+      });
+      port.postMessage({ type: 'resolve', episodeUrl });
+    });
+  }
+
   const extInit = (async () => {
     try {
       if (!window.chrome || !chrome.runtime || !chrome.runtime.sendMessage) return;
@@ -35,18 +64,21 @@
     return '/api/hls?u=' + encodeURIComponent(b64);
   }
 
-  async function resolveViaExtension(slug, season, episode) {
+  async function resolveViaExtension(slug, season, episode, onStatus) {
+    const say = onStatus || (() => {});
+    say('Episodeninfo wird vom Server geladen...');
     const infoResp = await fetch(
       `/api/episode-info?slug=${encodeURIComponent(slug)}&season=${season}&episode=${episode}`
     );
     const info = await infoResp.json();
     if (!infoResp.ok) throw new Error(info.error || `HTTP ${infoResp.status}`);
-    const r = await extSend({ type: 'resolve', episodeUrl: info.episodeUrl });
-    if (!r || !r.ok) throw new Error((r && r.error) || 'Extension-Fehler');
-    return { directM3u8: r.m3u8, m3u8: proxyUrlFor(r.m3u8), episode: info.episode, nextEpisode: info.nextEpisode };
+    say('Anfrage wird an Extension gesendet...');
+    const m3u8 = await extResolve(info.episodeUrl, say);
+    return { directM3u8: m3u8, m3u8: proxyUrlFor(m3u8), episode: info.episode, nextEpisode: info.nextEpisode };
   }
 
-  async function resolveViaServer(slug, season, episode) {
+  async function resolveViaServer(slug, season, episode, onStatus) {
+    if (onStatus) onStatus('Server löst Stream auf (Captcha + Extraktion)...');
     const resp = await fetch('/api/resolve', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -66,7 +98,7 @@
     return null;
   }
 
-  async function resolveStream(slug, season, episode) {
+  async function resolveStream(slug, season, episode, onStatus) {
     const key = `${slug}_${season}_${episode}`;
     const stashed = takeStash(key);
     if (stashed) return stashed;
@@ -75,7 +107,7 @@
     if (extReady) {
       let p = extCache.get(key);
       if (!p) {
-        p = resolveViaExtension(slug, season, episode);
+        p = resolveViaExtension(slug, season, episode, onStatus);
         extCache.set(key, p);
         p.catch(() => extCache.delete(key));
       }
@@ -86,12 +118,13 @@
         extCache.delete(key);
       }
     }
-    return resolveViaServer(slug, season, episode);
+    if (onStatus && extReady) onStatus('Extension fehlgeschlagen – Fallback auf Server...');
+    return resolveViaServer(slug, season, episode, onStatus);
   }
 
   /** Löst auf und merkt das Ergebnis für die Player-Seite vor. */
-  async function resolveAndStash(slug, season, episode) {
-    const data = await resolveStream(slug, season, episode);
+  async function resolveAndStash(slug, season, episode, onStatus) {
+    const data = await resolveStream(slug, season, episode, onStatus);
     sessionStorage.setItem(
       STASH_KEY,
       JSON.stringify({ key: `${slug}_${season}_${episode}`, ts: Date.now(), data })
@@ -113,6 +146,9 @@
     overlay.querySelector('.loading-sub').textContent = sub || '';
     overlay.classList.remove('hidden');
   }
+  function setLoadingStatus(text) {
+    if (overlay) overlay.querySelector('.loading-sub').textContent = text;
+  }
   function hideLoading() {
     if (overlay) overlay.classList.add('hidden');
   }
@@ -124,6 +160,7 @@
     resolveAndStash,
     showLoading,
     hideLoading,
+    setLoadingStatus,
     isExtReady: () => extReady,
   };
 })();

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "N2nd",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Löst Burning-Series-Streams lokal auf (eigene IP) und liefert die direkte M3U8 an N2nd (Nightsecond).",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsMkd72Y8WFztpA59QtW7CF7/MxZbES/c6qNMYMXjcgS6h8WFd+SJzBmoP5rZvQ1EW3j+p9KhVt9VSdOfgqILtqsmzeV0ZPTBhS0xFoME/pUK0X7S8DaCTHWpJAS7EAVvhEYNligM4sAaL1WvYvNsEVLhexJFmGNct+jPZrh5s9x35M9EcuD1QJ+BMQHFsVxy1nvbYN2/DuKxps3t2L4BSx7VaIGBWCz1tGyICxlSe7lBpw5VBMERX0LhgSLlh0swDXu8656trhApKJZBdmWRA+wdVtFCuNzNaVyGalkGtrra2UUkirA9sE3wQi1e/r2c6kXO/q/IWepQHduMx8P9cwIDAQAB",
   "background": {

@@ -193,7 +193,7 @@
     }
   }
 
-  const { extCache, resolveViaExtension, resolveStream, showLoading, hideLoading } = window.BSResolver;
+  const { extCache, resolveViaExtension, resolveStream, showLoading, hideLoading, setLoadingStatus } = window.BSResolver;
 
   /**
    * Löst eine Episode über die eigene API auf (CapSolver -> embed.php -> VOE -> M3U8)
@@ -221,8 +221,9 @@
     showLoading('Video wird geladen...');
 
     try {
-      const data = await resolveStream(slug, season, episode);
+      const data = await resolveStream(slug, season, episode, setLoadingStatus);
       if (myToken !== resolveToken) return; // inzwischen andere Folge gewählt
+      setLoadingStatus('Stream wird gestartet...');
       video.addEventListener('playing', hideLoading, { once: true });
 
       if (data.episode && data.episode.title) {

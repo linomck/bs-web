@@ -73,10 +73,11 @@ async function fetchTicket(apiBase, pageUrl, sitekey) {
   return d.ticket;
 }
 
-async function resolveEpisode(episodeUrl, apiBase) {
+async function resolveEpisode(episodeUrl, apiBase, step = () => {}) {
   const u = new URL(episodeUrl);
   if (!BS_HOSTS.includes(u.hostname)) throw new Error('Ungültiger Host');
 
+  step('Extension: Episodenseite wird geladen...');
   // credentials:'include' -> Browser-Cookie-Jar (DDoS-Guard-Cookies) wird genutzt
   const pageResp = await fetch(episodeUrl, { credentials: 'include' });
   if (!pageResp.ok) throw new Error(`Episodenseite HTTP ${pageResp.status}`);
@@ -85,8 +86,10 @@ async function resolveEpisode(episodeUrl, apiBase) {
   if (!lid) throw new Error('data-lid nicht gefunden');
   if (!sitekey) throw new Error('reCAPTCHA-Sitekey nicht gefunden');
 
+  step('Extension: Captcha wird gelöst (kann 10-40s dauern)...');
   const ticket = await fetchTicket(apiBase, pageUrl, sitekey);
 
+  step('Extension: Hoster-Link wird abgerufen...');
   const embed = await fetch(new URL('/ajax/embed.php', pageUrl).href, {
     method: 'POST',
     credentials: 'include',
@@ -104,6 +107,7 @@ async function resolveEpisode(episodeUrl, apiBase) {
   }
   if (!data.link) throw new Error('Kein VOE-Link: ' + JSON.stringify(data));
 
+  step('Extension: Stream wird extrahiert...');
   const m3u8 = await resolveVoe(data.link);
   if (!m3u8) throw new Error('M3U8 nicht extrahierbar');
   return m3u8;
@@ -121,4 +125,15 @@ chrome.runtime.onMessageExternal.addListener((msg, sender, sendResponse) => {
       .catch((e) => sendResponse({ ok: false, error: e.message }));
     return true;
   }
+});
+
+// Streaming-Variante mit Fortschritt: Port-Verbindung von der Webseite.
+chrome.runtime.onConnectExternal.addListener((port) => {
+  const origin = port.sender && port.sender.origin;
+  port.onMessage.addListener((msg) => {
+    if (!msg || msg.type !== 'resolve' || !origin) return;
+    resolveEpisode(msg.episodeUrl, origin, (text) => port.postMessage({ step: text }))
+      .then((m3u8) => port.postMessage({ done: true, m3u8 }))
+      .catch((e) => port.postMessage({ done: false, error: e.message }));
+  });
 });
