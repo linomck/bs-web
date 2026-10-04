@@ -108,7 +108,7 @@ async function login(req, res) {
       })
     );
   } catch (err) {
-    console.error('[Auth] Login-Fehler:', err.message);
+    console.error('[Auth] Login-Fehler:', err.stack);
     res.status(502).send('Login nicht verfügbar: ' + err.message);
   }
 }
@@ -151,7 +151,7 @@ async function callback(req, res) {
     setCookie(res, FLOW_COOKIE, '', 0);
     res.redirect(safeNext(flow.next));
   } catch (err) {
-    console.error('[Auth] Callback-Fehler:', err.message);
+    console.error('[Auth] Callback-Fehler:', err.stack);
     res.status(400).send('Login fehlgeschlagen: ' + err.message + ' <a href="/auth/login">Erneut versuchen</a>');
   }
 }
